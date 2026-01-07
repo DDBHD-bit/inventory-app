@@ -2,273 +2,178 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Inventory QR Lookup</title>
-
-<script src="https://unpkg.com/html5-qrcode"></script>
-<link rel="manifest" href="manifest.json">
+<title>Inventory App</title>
 
 <style>
-body{font-family:Arial;background:#f4f6f8;padding:15px}
-input,button{padding:10px;margin:5px}
-#loader{font-weight:bold;color:#555}
-#noResult{color:red;font-weight:bold}
-#colors img{width:55px;height:55px;border-radius:6px;margin:5px;border:2px solid #ccc;cursor:pointer}
-.selected{border:2px solid #000 !important}
-.size{background:#fff;margin:10px 0;padding:10px;border-radius:6px}
+body{font-family:Arial;margin:20px}
+input,select,button{padding:6px;margin:4px}
+.hidden{display:none}
+.card{border:1px solid #ccc;padding:10px;margin:10px 0}
 .low{color:red;font-weight:bold}
-.bin{margin-left:15px}
-
-/* LOCK SCREEN */
-#lockScreen{
-  position:fixed;
-  inset:0;
-  background:#f4f6f8;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:9999;
-}
-#lockBox{
-  background:#fff;
-  padding:30px;
-  border-radius:8px;
-  text-align:center;
-  width:300px;
-}
 </style>
 </head>
-
 <body>
 
-<!-- 🔒 STAFF LOCK SCREEN -->
-<div id="lockScreen">
-  <div id="lockBox">
+<!-- 🔐 LOCK SCREEN -->
+<div id="lockScreen" style="position:fixed;inset:0;background:#f4f6f8;display:flex;align-items:center;justify-content:center">
+  <div style="background:#fff;padding:20px">
     <h3>Staff Login</h3>
-    <input type="password" id="staffPwd" placeholder="Enter password"><br><br>
-    <button onclick="unlockApp()">Login</button>
-    <p id="lockError" style="color:red;display:none">Wrong password</p>
+    <input id="staffName" placeholder="Staff name"><br>
+    <input id="staffPwd" type="password" placeholder="Password"><br><br>
+    <button onclick="login()">Login</button>
+    <p id="lockErr" style="color:red"></p>
   </div>
 </div>
 
-<h2>Inventory Lookup</h2>
+<h2>Inventory Search</h2>
 
-<input id="manual" placeholder="Enter Code or Name">
-<button onclick="manualSearch()">Search</button>
-<button onclick="startScan()">Scan QR</button>
-<button onclick="toggleAdmin()">Admin Login</button>
-<button onclick="exportExcel()">Export Excel</button>
-<button onclick="logout()">Logout</button>
+<input id="search" placeholder="Search / Scan product">
+<button onclick="runSearch()">Search</button>
 
-<div id="loader">Loading inventory…</div>
-<div id="noResult" style="display:none">No product found</div>
+<div id="results"></div>
 
-<div id="reader" style="width:300px"></div>
+<div id="stockPanel" class="hidden">
+  <h3>Stock IN / OUT</h3>
 
-<hr>
+  <select id="binSelect"></select><br>
+  <input id="qty" type="number" placeholder="Quantity">
+  <select id="dir">
+    <option value="1">IN</option>
+    <option value="-1">OUT</option>
+  </select><br>
+  <input id="remark" placeholder="Remark (required for OUT)">
+  <br><br>
+  <button onclick="updateStock()">Update Stock</button>
+  <p id="msg"></p>
+</div>
 
-<img id="productImage" width="200"><br>
-<h3 id="productName"></h3>
-<div id="colors"></div>
-<div id="sizes"></div>
+<!-- 🔥 FIREBASE -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, getDocs, query, where, updateDoc, addDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+/* 🔧 CHANGE THIS */
+const firebaseConfig = {
+  apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
+  authDomain: "inventory-app-9f7a3.firebaseapp.com",
+  projectId: "inventory-app-9f7a3"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+window.db=db;
+window.fs={collection,getDocs,query,where,updateDoc,addDoc,doc};
+</script>
 
 <script>
-/* ================= CONFIG ================= */
-const SHEET_URL = "https://docs.google.com/spreadsheets/d/11x2ru9LhUB2l_dSFXsQmie-qQuV6j6sCgQFchaLI7AU/gviz/tq?tqx=out:json";
-const STAFF_PASSWORD = "staff123";   // change
-const ADMIN_PASSWORD = "admin123";   // change
+/* 🔐 CONFIG */
+const STAFF_PASSWORD="staff123";   // change this
+const LOW_STOCK=5;
 
-/* ============== ELEMENTS ================== */
-const colorsDiv = document.getElementById("colors");
-const productName = document.getElementById("productName");
-const sizes = document.getElementById("sizes");
-const loader = document.getElementById("loader");
-const noResult = document.getElementById("noResult");
-const lockScreen = document.getElementById("lockScreen");
-const lockError = document.getElementById("lockError");
+let data=[], selectedRow=null;
 
-/* ============== STATE ===================== */
-let data = [];
-let productData = [];
-let showPrice = false;
-
-/* ============== AUTH ====================== */
-function unlockApp(){
-  if(staffPwd.value === STAFF_PASSWORD){
-    localStorage.setItem("staffAuth","yes");
+/* AUTH */
+function login(){
+  if(staffPwd.value===STAFF_PASSWORD){
+    localStorage.setItem("auth","yes");
+    localStorage.setItem("staff",staffName.value||"Staff");
     lockScreen.style.display="none";
     loadInventory();
-  }else{
-    lockError.style.display="block";
-  }
+  }else lockErr.innerText="Wrong password";
+}
+if(localStorage.getItem("auth")==="yes"){
+  lockScreen.style.display="none";
+  loadInventory();
 }
 
-function logout(){
-  localStorage.removeItem("staffAuth");
-  location.reload();
+/* LOAD DATA */
+async function loadInventory(){
+  data=[];
+  const snap=await fs.getDocs(fs.collection(db,"inventory"));
+  snap.forEach(d=>data.push({id:d.id,...d.data()}));
 }
 
-function checkAuth(){
-  if(localStorage.getItem("staffAuth")==="yes"){
-    lockScreen.style.display="none";
-    loadInventory();
-  }
-}
+/* SEARCH */
+function runSearch(){
+  results.innerHTML="";
+  stockPanel.classList.add("hidden");
 
-/* ============== LOAD INVENTORY ============ */
-function loadInventory(){
-  loader.style.display="block";
+  const q=search.value.toLowerCase();
+  if(!q) return;
 
-  fetch(SHEET_URL)
-  .then(r=>r.text())
-  .then(t=>{
-    const json = JSON.parse(t.substring(47).slice(0,-2));
-    data = json.table.rows.map(row=>{
-      const c=row.c||[];
-      return {
-        Code:(c[0]?.v||"").trim(),
-        Name:(c[1]?.v||"").trim(),
-        Color:(c[2]?.v||"").trim(),
-        Size:(c[3]?.v||"").trim(),
-        Bin:(c[4]?.v||"").trim(),
-        Stock:Number(c[5]?.v||0),
-        Price:c[6]?.v||"",
-        ImageURL:c[8]?.v||""
-      };
-    });
-    localStorage.setItem("inventoryData",JSON.stringify(data));
-  })
-  .catch(()=>{
-    data = JSON.parse(localStorage.getItem("inventoryData")||"[]");
-  })
-  .finally(()=>{
-    loader.style.display="none";
-    const last = localStorage.getItem("lastProduct");
-    if(last){
-      productData = JSON.parse(last);
-      renderProduct();
-    }
-  });
-}
-
-/* ============== SEARCH ==================== */
-function manualSearch(){
-  const q = manual.value.trim().toLowerCase();
-  if(!q){ clearUI(); return; }
-
-  productData = data.filter(d =>
-    d.Code.toLowerCase().includes(q) ||
-    d.Name.toLowerCase().includes(q)
+  const found=data.filter(d=>
+    d.code.toLowerCase().includes(q) ||
+    d.name.toLowerCase().includes(q) ||
+    d.color.toLowerCase().includes(q) ||
+    d.size.toLowerCase().includes(q)
   );
 
-  localStorage.setItem("lastProduct",JSON.stringify(productData));
-  renderProduct();
-}
-
-/* ============== QR SCAN =================== */
-function startScan(){
-  const qr = new Html5Qrcode("reader");
-  qr.start({facingMode:"environment"},{fps:10,qrbox:250},
-    txt=>{
-      navigator.vibrate(200);
-      new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg").play();
-      qr.stop();
-      productData = data.filter(d=>d.Code===txt);
-      localStorage.setItem("lastProduct",JSON.stringify(productData));
-      renderProduct();
-    }
-  );
-}
-
-/* ============== RENDER ==================== */
-function renderProduct(){
-  clearUI();
-
-  if(!productData.length){
-    noResult.style.display="block";
+  if(!found.length){
+    results.innerHTML="<p>No product found</p>";
     return;
   }
 
-  productName.innerText = productData[0].Name;
-  const colors=[...new Set(productData.map(d=>d.Color))];
+  found.forEach(d=>{
+    const div=document.createElement("div");
+    div.className="card";
+    if(d.stock<=LOW_STOCK) div.classList.add("low");
 
-  if(colors.length===1){
-    showColor(colors[0]);
-  }
-
-  colors.forEach(c=>{
-    const img=document.createElement("img");
-    img.src=productData.find(d=>d.Color===c).ImageURL;
-    img.onclick=()=>showColor(c,img);
-    colorsDiv.appendChild(img);
+    div.innerHTML=`
+      <b>${d.code}</b> - ${d.name}<br>
+      Color: ${d.color} | Size: ${d.size} | Bin: ${d.bin}<br>
+      Stock: ${d.stock} | Price: ₹${d.price}<br>
+      <button>Select</button>
+    `;
+    div.querySelector("button").onclick=()=>selectRow(d);
+    results.appendChild(div);
   });
 }
 
-function showColor(color,img){
-  [...colorsDiv.children].forEach(i=>i.classList.remove("selected"));
-  if(img) img.classList.add("selected");
+/* SELECT */
+function selectRow(d){
+  selectedRow=d;
+  stockPanel.classList.remove("hidden");
+  binSelect.innerHTML=`<option>${d.bin}</option>`;
+}
 
-  const cd = productData.filter(d=>d.Color===color);
-  productImage.src = cd[0].ImageURL;
+/* STOCK UPDATE */
+async function updateStock(){
+  if(!selectedRow) return;
 
-  const grouped={};
-  cd.forEach(d=>{
-    grouped[d.Size]=grouped[d.Size]||[];
-    grouped[d.Size].push(d);
+  const qtyVal=Number(qty.value)*Number(dir.value);
+  if(!qtyVal) return alert("Enter quantity");
+
+  if(qtyVal<0 && !remark.value)
+    return alert("Remark required for OUT");
+
+  const newStock=selectedRow.stock+qtyVal;
+  if(newStock<0) return alert("Insufficient stock");
+
+  await fs.updateDoc(
+    fs.doc(db,"inventory",selectedRow.id),
+    {stock:newStock}
+  );
+
+  await fs.addDoc(fs.collection(db,"audit_logs"),{
+    timestamp:new Date(),
+    staff:localStorage.getItem("staff"),
+    code:selectedRow.code,
+    name:selectedRow.name,
+    color:selectedRow.color,
+    size:selectedRow.size,
+    bin:selectedRow.bin,
+    action:qtyVal>0?"IN":"OUT",
+    qty:Math.abs(qtyVal),
+    stockAfter:newStock,
+    remark:remark.value||""
   });
 
-  Object.keys(grouped).forEach(size=>{
-    let total=0;
-    let html=`<div class="size"><b>Size:</b> ${size}<br>`;
-    if(showPrice){
-      html+=`<b>Price:</b> ₹${grouped[size][0].Price}<br>`;
-    }
-    grouped[size].forEach(b=>{
-      total+=b.Stock;
-      html+=`<div class="bin ${b.Stock<=3?'low':''}">
-        Bin ${b.Bin}: ${b.Stock}
-      </div>`;
-    });
-    html+=`<div><b>Total:</b> ${total}</div></div>`;
-    sizes.innerHTML+=html;
-  });
+  msg.innerText="Stock updated";
+  qty.value="";
+  remark.value="";
+  loadInventory();
 }
-
-function clearUI(){
-  noResult.style.display="none";
-  colorsDiv.innerHTML="";
-  sizes.innerHTML="";
-}
-
-/* ============== ADMIN ===================== */
-function toggleAdmin(){
-  const pwd = prompt("Enter admin password");
-  if(pwd===ADMIN_PASSWORD){
-    showPrice=true;
-    renderProduct();
-  }else alert("Wrong password");
-}
-
-/* ============== EXPORT ==================== */
-function exportExcel(){
-  if(!productData.length) return;
-  let csv="Code,Name,Color,Size,Bin,Stock,Price\n";
-  productData.forEach(r=>{
-    csv+=`${r.Code},${r.Name},${r.Color},${r.Size},${r.Bin},${r.Stock},${r.Price}\n`;
-  });
-  const blob=new Blob([csv],{type:"text/csv"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="inventory.csv";
-  a.click();
-}
-
-/* ============== PWA ======================= */
-if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("service-worker.js");
-}
-
-/* START */
-checkAuth();
 </script>
 
 </body>
