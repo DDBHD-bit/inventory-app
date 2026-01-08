@@ -14,55 +14,98 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
 
 <style>
-body{margin:0;font-family:Arial;background:#f1f5f9}
-header{background:#1e40af;color:#fff;padding:12px 16px;display:flex;justify-content:space-between}
-.container{padding:16px;max-width:900px;margin:auto}
-.card{background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 2px 6px rgba(0,0,0,.1)}
-input,button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:1px solid #ccc}
-button{background:#2563eb;color:#fff;border:none}
-button.secondary{background:#64748b}
-.hidden{display:none}
-.product{display:flex;gap:12px}
-.product img{width:80px;height:80px;border-radius:10px;object-fit:cover}
-.actions button{width:auto;margin-right:6px}
-.low{color:red;font-weight:bold}
-/* Modal overlay */
-.modal {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
+body{
+  margin:0;
+  font-family:Arial;
+  background:#f1f5f9;
 }
 
-/* Modal content */
-.modal .card {
-  width: 100%;
-  max-width: 420px;
-}
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
+header{
+  background:#1e40af;
+  color:#fff;
+  padding:12px 16px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
 }
 
-.modal.hidden {
-  display: none;
+.container{
+  max-width:900px;
+  margin:auto;
+  padding:16px;
 }
 
-.modal .card {
-  width: 100%;
-  max-width: 420px;
+.card{
+  background:#fff;
+  border-radius:12px;
+  padding:14px;
+  margin-bottom:14px;
+  box-shadow:0 2px 6px rgba(0,0,0,.1);
 }
 
+input, button{
+  width:100%;
+  padding:10px;
+  margin-top:8px;
+  border-radius:8px;
+  border:1px solid #ccc;
+}
+
+button{
+  background:#2563eb;
+  color:#fff;
+  border:none;
+}
+
+button.secondary{
+  background:#64748b;
+}
+
+.product{
+  display:flex;
+  gap:12px;
+}
+
+.product img{
+  width:80px;
+  height:80px;
+  border-radius:10px;
+  object-fit:cover;
+}
+
+.actions button{
+  width:auto;
+  margin-right:6px;
+}
+
+.low{
+  color:red;
+  font-weight:bold;
+}
+
+/* 🔑 VISIBILITY CONTROL */
+.hidden{
+  display:none !important;
+}
+
+/* 🔑 MODAL (FIXED) */
+.modal{
+  position:fixed;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  background:rgba(0,0,0,0.45);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+}
+
+.modal .card{
+  width:100%;
+  max-width:420px;
+}
 </style>
 </head>
 
@@ -90,10 +133,11 @@ button.secondary{background:#64748b}
   <div id="products"></div>
 </div>
 
-<!-- ADD PRODUCT -->
+<!-- ADD PRODUCT MODAL (HIDDEN BY DEFAULT) -->
 <div class="modal hidden" id="addBox">
   <div class="card">
     <h3>Add Product</h3>
+
     <input id="pname" placeholder="Name">
     <input id="pcode" placeholder="Code">
     <input id="pcolor" placeholder="Color">
@@ -101,13 +145,14 @@ button.secondary{background:#64748b}
     <input id="pprice" type="number" placeholder="Price">
     <input id="pstock" type="number" placeholder="Stock">
     <input type="file" id="pimage" accept="image/*" capture="environment">
+
     <button onclick="addProduct()">Save</button>
     <button class="secondary" onclick="hideAdd()">Cancel</button>
   </div>
 </div>
 
 <script>
-// 🔐 Firebase config
+// 🔐 Firebase
 firebase.initializeApp({
   apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
   authDomain: "inventory-app-9f7a3.firebaseapp.com",
@@ -121,38 +166,44 @@ const db = firebase.firestore();
 const CLOUD_NAME = "dahxnopuw";
 const UPLOAD_PRESET = "inventory_unsigned";
 
-// 🔐 Auth
-auth.onAuthStateChanged(u=>{
-  loginBox.classList.toggle("hidden", !!u);
-  appBox.classList.toggle("hidden", !u);
-  if(u) loadProducts();
+// 🔐 Auth handling
+auth.onAuthStateChanged(user=>{
+  loginBox.classList.toggle("hidden", !!user);
+  appBox.classList.toggle("hidden", !user);
+  if(user) loadProducts();
 });
 
 function login(){
   auth.signInWithEmailAndPassword(email.value, password.value)
     .catch(e=>alert(e.message));
 }
-function logout(){ auth.signOut(); }
+
+function logout(){
+  auth.signOut();
+}
 
 // 📷 Image compression
 function compressImage(file){
   return new Promise(resolve=>{
     const img=new Image();
     img.onload=()=>{
-      const c=document.createElement("canvas");
+      const canvas=document.createElement("canvas");
       const max=800;
-      let w=img.width,h=img.height;
-      if(w>h && w>max){h*=max/w;w=max}
-      else if(h>max){w*=max/h;h=max}
-      c.width=w;c.height=h;
-      c.getContext("2d").drawImage(img,0,0,w,h);
-      c.toBlob(b=>resolve(b),"image/jpeg",0.7);
+      let w=img.width, h=img.height;
+
+      if(w>h && w>max){ h*=max/w; w=max; }
+      else if(h>max){ w*=max/h; h=max; }
+
+      canvas.width=w;
+      canvas.height=h;
+      canvas.getContext("2d").drawImage(img,0,0,w,h);
+      canvas.toBlob(b=>resolve(b),"image/jpeg",0.7);
     };
     img.src=URL.createObjectURL(file);
   });
 }
 
-// ☁️ Upload to Cloudinary
+// ☁️ Cloudinary upload
 async function uploadToCloudinary(file){
   const blob=await compressImage(file);
   const fd=new FormData();
@@ -161,37 +212,40 @@ async function uploadToCloudinary(file){
 
   const res=await fetch(
     `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-    {method:"POST",body:fd}
+    { method:"POST", body:fd }
   );
+
   const data=await res.json();
   return data.secure_url;
 }
 
 // ➕ Add product
-<!-- ADD PRODUCT MODAL -->
-<div class="modal hidden" id="addBox">
-  <div class="card">
-    <h3>Add Product</h3>
+async function addProduct(){
+  if(!pimage.files[0]) return alert("Image required");
 
-    <input id="pname" placeholder="Name">
-    <input id="pcode" placeholder="Code">
-    <input id="pcolor" placeholder="Color">
-    <input id="psize" placeholder="Size">
-    <input id="pprice" type="number" placeholder="Price">
-    <input id="pstock" type="number" placeholder="Stock">
-    <input type="file" id="pimage" accept="image/*" capture="environment">
+  const imageUrl = await uploadToCloudinary(pimage.files[0]);
 
-    <button onclick="addProduct()">Save</button>
-    <button class="secondary" onclick="hideAdd()">Cancel</button>
-  </div>
-</div>
+  await db.collection("products").add({
+    name:pname.value,
+    code:pcode.value,
+    color:pcolor.value,
+    size:psize.value,
+    price:+pprice.value,
+    stock:+pstock.value,
+    image:imageUrl,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
 
+  hideAdd();
+  loadProducts();
+}
 
 // 📦 Load products
 async function loadProducts(){
   products.innerHTML="";
   const q=search.value.toLowerCase();
-  const snap=await db.collection("inventory").get();
+
+  const snap=await db.collection("products").get();
 
   snap.forEach(d=>{
     const p=d.data();
@@ -212,34 +266,31 @@ async function loadProducts(){
           <button onclick="updateStock('${d.id}',-1)">OUT</button>
         </div>
         <div id="qr${d.id}"></div>
-      </div>`;
+      </div>
+    `;
     products.appendChild(div);
     new QRCode("qr"+d.id, p.code);
   });
 }
 
 async function updateStock(id,delta){
-  const ref=db.collection("inventory").doc(id);
+  const ref=db.collection("products").doc(id);
   const doc=await ref.get();
-  await ref.update({stock:doc.data().stock+delta});
+  await ref.update({ stock: doc.data().stock + delta });
   loadProducts();
 }
 
+// 🧩 Modal control (FINAL)
 function showAdd(){
   addBox.classList.remove("hidden");
-  document.body.style.overflow = "hidden";
+  document.body.style.overflow="hidden";
 }
 
 function hideAdd(){
   addBox.classList.add("hidden");
-  document.body.style.overflow = "auto";
+  document.body.style.overflow="auto";
 }
-
 </script>
 
 </body>
 </html>
-
-
-
-
