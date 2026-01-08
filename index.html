@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <title>Inventory App</title>
-
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -11,7 +10,7 @@
 
 <style>
 body{font-family:Arial;background:#f2f2f2;margin:0;padding:12px}
-button{padding:6px 10px;border:none;background:#007bff;color:white;border-radius:6px;cursor:pointer}
+button{padding:6px 10px;border:none;background:#007bff;color:white;border-radius:6px;cursor:pointer;margin:2px}
 button.red{background:#dc3545}
 .hidden{display:none}
 .card{background:white;padding:12px;margin-top:12px;border-radius:10px;box-shadow:0 4px 8px rgba(0,0,0,.08)}
@@ -32,7 +31,7 @@ img.prodImg{width:80px;border-radius:6px;margin-bottom:6px}
 </head>
 <body>
 
-<!-- LOGIN SCREEN -->
+<!-- LOGIN -->
 <div id="loginBox">
   <h3>Login</h3>
   <input id="email" type="email" placeholder="Email"><br>
@@ -44,7 +43,7 @@ img.prodImg{width:80px;border-radius:6px;margin-bottom:6px}
 <div id="appUI" class="hidden"></div>
 
 <script>
-// Firebase config
+// 🔥 Firebase
 firebase.initializeApp({
 
   apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
@@ -60,7 +59,7 @@ const CLOUDINARY_PRESET = "inventory_unsigned";
 
 let USER_ROLE="staff", ALL_DATA={}, html5QrCode;
 
-// LOGIN FUNCTION
+// LOGIN
 function login(){
   auth.signInWithEmailAndPassword(email.value,password.value).catch(e=>alert(e.message));
 }
@@ -82,9 +81,10 @@ auth.onAuthStateChanged(async user=>{
   loadInventory();
 });
 
+// LOGOUT
 function logout(){ auth.signOut(); }
 
-// Build full app UI dynamically
+// === BUILD APP UI DYNAMICALLY ===
 function buildAppUI(){
   const appUI = document.getElementById("appUI");
   appUI.innerHTML=`
@@ -133,7 +133,7 @@ function buildAppUI(){
     </div>
   `;
 
-  // Attach event listeners
+  // Attach events
   if(USER_ROLE==="admin"){
     document.getElementById("addBtn").onclick=showAdd;
     document.getElementById("dailyBtn").onclick=openDailySummary;
@@ -143,7 +143,7 @@ function buildAppUI(){
   document.getElementById("scanBtn").onclick=startScan;
 }
 
-// === INVENTORY ===
+// === INVENTORY FUNCTIONS ===
 async function loadInventory(){
   const snap = await db.collection("inventory").get();
   ALL_DATA={};
@@ -176,6 +176,7 @@ function render(data){
   });
 }
 
+// SEARCH
 function filter(){
   const q=document.getElementById("search").value.toLowerCase();
   const f={};
@@ -185,7 +186,7 @@ function filter(){
   render(f);
 }
 
-// STOCK CHANGE
+// STOCK IN/OUT
 async function stockChange(code,color,size,delta){
   const q=await db.collection("inventory").where("code","==",code).where("color","==",color).where("size","==",size).limit(1).get();
   if(q.empty) return;
@@ -212,7 +213,6 @@ async function addProduct(){
   });
   alert("Product added"); hideAdd(); loadInventory();
 }
-
 function showAdd(){document.getElementById("addBox").classList.remove("hidden");}
 function hideAdd(){document.getElementById("addBox").classList.add("hidden");}
 
