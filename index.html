@@ -181,9 +181,13 @@ auth.onAuthStateChanged(async user=>{
 });
 
 function login(){
-  auth.signInWithEmailAndPassword(email.value,password.value)
-  .catch(e=>alert(e.message));
+  const emailVal = document.getElementById("email").value;
+  const passVal = document.getElementById("password").value;
+
+  auth.signInWithEmailAndPassword(emailVal, passVal)
+    .catch(err => alert(err.message));
 }
+
 function logout(){ auth.signOut(); }
 
 async function loadInventory(){
@@ -349,5 +353,6 @@ async function loadAudit(){
 
 </body>
 </html>
+
 
 
