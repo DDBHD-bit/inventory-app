@@ -25,22 +25,18 @@ th{background:#eee}
 input{width:100%;padding:6px;margin-bottom:6px}
 img.prodImg{width:80px;border-radius:6px;margin-bottom:6px}
 #loginBox{z-index:9999;position:relative;background:#fff;padding:20px;border-radius:8px;max-width:300px;margin:100px auto;box-shadow:0 4px 8px rgba(0,0,0,.2)}
-#appUI{display:flex;flex-direction:column}
 #qrScanner{width:100%;max-width:320px;margin-top:10px}
 </style>
 </head>
 <body>
 
-<!-- LOGIN -->
+<!-- LOGIN SCREEN -->
 <div id="loginBox">
   <h3>Login</h3>
   <input id="email" type="email" placeholder="Email"><br>
   <input id="password" type="password" placeholder="Password"><br>
   <button onclick="login()">Login</button>
 </div>
-
-<!-- APP CONTAINER -->
-<div id="appUI" class="hidden"></div>
 
 <script>
 // 🔥 Firebase
@@ -68,15 +64,18 @@ function login(){
 auth.onAuthStateChanged(async user=>{
   if(!user) return;
 
-  loginBox.classList.add("hidden");
-  const appUI = document.getElementById("appUI");
-  appUI.classList.remove("hidden");
+  loginBox.style.display="none";
+
+  // Create app container dynamically
+  const appUI=document.createElement("div");
+  appUI.id="appUI";
+  document.body.appendChild(appUI);
 
   // Fetch role
   const doc = await db.collection("users").doc(user.uid).get();
   USER_ROLE = doc.exists?doc.data().role:"staff";
 
-  // Build UI dynamically
+  // Build app UI dynamically
   buildAppUI();
   loadInventory();
 });
@@ -89,7 +88,7 @@ function buildAppUI(){
   const appUI = document.getElementById("appUI");
   appUI.innerHTML=`
     <header>
-      <h3>Inventory</h3>
+      <h3>Inventory App</h3>
       <div>
         <button id="scanBtn">Scan QR</button>
         ${USER_ROLE==="admin"?'<button id="addBtn">Add Product</button><button id="dailyBtn">Daily Summary</button><button id="auditBtn">Audit Logs</button>':""}
@@ -133,10 +132,10 @@ function buildAppUI(){
     </div>
   `;
 
-  // Attach events
+  // Attach event listeners
   if(USER_ROLE==="admin"){
-    document.getElementById("addBtn").onclick=showAdd;
-    document.getElementById("dailyBtn").onclick=openDailySummary;
+    document.getElementById("addBtn").onclick=()=>document.getElementById("addBox").classList.remove("hidden");
+    document.getElementById("dailyBtn").onclick=()=>document.getElementById("summaryBox").classList.remove("hidden");
     document.getElementById("auditBtn").onclick=openAudit;
   }
   document.getElementById("search").oninput=filter;
@@ -176,7 +175,6 @@ function render(data){
   });
 }
 
-// SEARCH
 function filter(){
   const q=document.getElementById("search").value.toLowerCase();
   const f={};
@@ -211,10 +209,8 @@ async function addProduct(){
     imageUrl:imgUrl,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   });
-  alert("Product added"); hideAdd(); loadInventory();
+  alert("Product added"); document.getElementById("addBox").classList.add("hidden"); loadInventory();
 }
-function showAdd(){document.getElementById("addBox").classList.remove("hidden");}
-function hideAdd(){document.getElementById("addBox").classList.add("hidden");}
 
 // AUDIT LOG
 function openAudit(){document.getElementById("auditBox").classList.remove("hidden"); loadAudit();}
@@ -234,7 +230,7 @@ async function loadAudit(){
 // DAILY SUMMARY
 function openDailySummary(){const sb=document.getElementById("summaryBox"); sb.classList.remove("hidden"); document.getElementById("summaryDate").value=new Date().toISOString().split("T")[0]; loadSummary(document.getElementById("summaryDate").value);}
 function closeSummary(){document.getElementById("summaryBox").classList.add("hidden");}
-document.getElementById("appUI").addEventListener("change",e=>{if(e.target.id==="summaryDate") loadSummary(e.target.value);});
+document.getElementById("appUI")?.addEventListener("change",e=>{if(e.target.id==="summaryDate") loadSummary(e.target.value);});
 async function loadSummary(dateStr){
   const tbody=document.getElementById("summaryBody"); tbody.innerHTML="<tr><td colspan='6'>Loading...</td></tr>";
   const s=new Date(dateStr); s.setHours(0,0,0,0);
