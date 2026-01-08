@@ -5,176 +5,165 @@
 <title>Inventory App</title>
 
 <style>
-body{font-family:Arial;margin:20px}
-input,select,button{padding:6px;margin:4px}
-.hidden{display:none}
-.card{border:1px solid #ccc;padding:10px;margin:10px 0}
+body{font-family:Arial;background:#f4f6f8;padding:15px}
+.search{width:100%;padding:10px;font-size:16px;margin-bottom:15px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:15px}
+.card{background:#fff;padding:12px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.1)}
+.card img{width:100%;height:160px;object-fit:cover;border-radius:6px}
+.badge{background:#eee;padding:2px 8px;border-radius:12px;font-size:12px;margin-right:4px}
+.actions{display:flex;gap:6px;margin-top:8px}
+button{padding:6px;border:none;border-radius:5px;cursor:pointer}
+.in{background:#e8f5e9}
+.out{background:#ffebee}
+.edit{background:#e3f2fd}
+.del{background:#fce4ec}
 .low{color:red;font-weight:bold}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);justify-content:center;align-items:center}
+.modal-box{background:#fff;padding:15px;width:90%;max-width:400px;border-radius:8px}
+.modal-box input{width:100%;padding:8px;margin-bottom:8px}
 </style>
 </head>
+
 <body>
 
-<!-- 🔐 LOCK SCREEN -->
-<div id="lockScreen" style="position:fixed;inset:0;background:#f4f6f8;display:flex;align-items:center;justify-content:center">
-  <div style="background:#fff;padding:20px">
-    <h3>Staff Login</h3>
-    <input id="staffName" placeholder="Staff name"><br>
-    <input id="staffPwd" type="password" placeholder="Password"><br><br>
-    <button onclick="login()">Login</button>
-    <p id="lockErr" style="color:red"></p>
+<h2>Inventory</h2>
+<input class="search" placeholder="Search..." oninput="search(this.value)">
+<div id="list" class="grid"></div>
+
+<!-- EDIT MODAL -->
+<div id="editModal" class="modal">
+  <div class="modal-box">
+    <h3>Edit Product</h3>
+    <input id="e_name">
+    <input id="e_color">
+    <input id="e_size">
+    <input id="e_bin">
+    <input id="e_price" type="number">
+    <button class="edit" onclick="saveEdit()">Save</button>
+    <button onclick="closeEdit()">Cancel</button>
   </div>
 </div>
 
-<h2>Inventory Search</h2>
-
-<input id="search" placeholder="Search / Scan product">
-<button onclick="runSearch()">Search</button>
-
-<div id="results"></div>
-
-<div id="stockPanel" class="hidden">
-  <h3>Stock IN / OUT</h3>
-
-  <select id="binSelect"></select><br>
-  <input id="qty" type="number" placeholder="Quantity">
-  <select id="dir">
-    <option value="1">IN</option>
-    <option value="-1">OUT</option>
-  </select><br>
-  <input id="remark" placeholder="Remark (required for OUT)">
-  <br><br>
-  <button onclick="updateStock()">Update Stock</button>
-  <p id="msg"></p>
-</div>
-
-<!-- 🔥 FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs, query, where, updateDoc, addDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import {
+  getFirestore, collection, getDocs, doc, updateDoc,
+  deleteDoc, addDoc, increment, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-/* 🔧 CHANGE THIS */
+/* 🔑 PASTE YOUR FIREBASE CONFIG HERE */
 const firebaseConfig = {
-  apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
-  authDomain: "inventory-app-9f7a3.firebaseapp.com",
-  projectId: "inventory-app-9f7a3"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-window.db=db;
-window.fs={collection,getDocs,query,where,updateDoc,addDoc,doc};
-</script>
+let products = [];
+let editId = null;
 
-<script>
-/* 🔐 CONFIG */
-const STAFF_PASSWORD="staff123";   // change this
-const LOW_STOCK=5;
+/* TEMP ROLE (replace with Auth later) */
+localStorage.setItem("role","admin");
 
-let data=[], selectedRow=null;
-
-/* AUTH */
-function login(){
-  if(staffPwd.value===STAFF_PASSWORD){
-    localStorage.setItem("auth","yes");
-    localStorage.setItem("staff",staffName.value||"Staff");
-    lockScreen.style.display="none";
-    loadInventory();
-  }else lockErr.innerText="Wrong password";
-}
-if(localStorage.getItem("auth")==="yes"){
-  lockScreen.style.display="none";
-  loadInventory();
+function isAdmin(){
+  return localStorage.getItem("role")==="admin";
 }
 
-/* LOAD DATA */
-async function loadInventory(){
-  data=[];
-  const snap=await fs.getDocs(fs.collection(db,"inventory"));
-  snap.forEach(d=>data.push({id:d.id,...d.data()}));
+async function load(){
+  const snap = await getDocs(collection(db,"inventory"));
+  products = snap.docs.map(d=>({id:d.id,...d.data()}));
+  render(products);
 }
+load();
 
-/* SEARCH */
-function runSearch(){
-  results.innerHTML="";
-  stockPanel.classList.add("hidden");
+function render(data){
+  list.innerHTML="";
+  data.forEach(p=>{
+    list.innerHTML+=`
+    <div class="card">
+      <img src="${p.image||'https://via.placeholder.com/300'}">
+      <h3>${p.name}</h3>
+      <div>
+        <span class="badge">${p.code}</span>
+        <span class="badge">${p.color}</span>
+        <span class="badge">${p.size}</span>
+      </div>
+      <div>Bin: ${p.bin}</div>
+      <div class="${p.stock<5?'low':''}">Stock: ${p.stock}</div>
+      <b>₹${p.price}</b>
 
-  const q=search.value.toLowerCase();
-  if(!q) return;
+      <div class="actions">
+        <button class="in" onclick="stock('${p.id}','${p.code}',1)">IN</button>
+        <button class="out" onclick="stock('${p.id}','${p.code}',-1)">OUT</button>
+      </div>
 
-  const found=data.filter(d=>
-    d.code.toLowerCase().includes(q) ||
-    d.name.toLowerCase().includes(q) ||
-    d.color.toLowerCase().includes(q) ||
-    d.size.toLowerCase().includes(q)
-  );
-
-  if(!found.length){
-    results.innerHTML="<p>No product found</p>";
-    return;
-  }
-
-  found.forEach(d=>{
-    const div=document.createElement("div");
-    div.className="card";
-    if(d.stock<=LOW_STOCK) div.classList.add("low");
-
-    div.innerHTML=`
-      <b>${d.code}</b> - ${d.name}<br>
-      Color: ${d.color} | Size: ${d.size} | Bin: ${d.bin}<br>
-      Stock: ${d.stock} | Price: ₹${d.price}<br>
-      <button>Select</button>
-    `;
-    div.querySelector("button").onclick=()=>selectRow(d);
-    results.appendChild(div);
+      ${isAdmin()?`
+      <div class="actions">
+        <button class="edit" onclick="edit('${p.id}')">Edit</button>
+        <button class="del" onclick="remove('${p.id}','${p.code}')">Delete</button>
+      </div>`:""}
+    </div>`;
   });
 }
 
-/* SELECT */
-function selectRow(d){
-  selectedRow=d;
-  stockPanel.classList.remove("hidden");
-  binSelect.innerHTML=`<option>${d.bin}</option>`;
+window.search=q=>{
+  q=q.toLowerCase();
+  render(products.filter(p=>
+    p.name.toLowerCase().includes(q)||
+    p.code.toLowerCase().includes(q)||
+    p.color.toLowerCase().includes(q)
+  ));
 }
 
-/* STOCK UPDATE */
-async function updateStock(){
-  if(!selectedRow) return;
+window.stock=async(id,code,d)=>{
+  const qty=+prompt("Qty?");
+  if(!qty)return;
+  await updateDoc(doc(db,"inventory",id),{stock:increment(d*qty)});
+  await log(d>0?"STOCK_IN":"STOCK_OUT",code,qty);
+  load();
+}
 
-  const qtyVal=Number(qty.value)*Number(dir.value);
-  if(!qtyVal) return alert("Enter quantity");
+window.edit=async(id)=>{
+  editId=id;
+  const p=products.find(x=>x.id===id);
+  e_name.value=p.name;
+  e_color.value=p.color;
+  e_size.value=p.size;
+  e_bin.value=p.bin;
+  e_price.value=p.price;
+  editModal.style.display="flex";
+}
 
-  if(qtyVal<0 && !remark.value)
-    return alert("Remark required for OUT");
-
-  const newStock=selectedRow.stock+qtyVal;
-  if(newStock<0) return alert("Insufficient stock");
-
-  await fs.updateDoc(
-    fs.doc(db,"inventory",selectedRow.id),
-    {stock:newStock}
-  );
-
-  await fs.addDoc(fs.collection(db,"audit_logs"),{
-    timestamp:new Date(),
-    staff:localStorage.getItem("staff"),
-    code:selectedRow.code,
-    name:selectedRow.name,
-    color:selectedRow.color,
-    size:selectedRow.size,
-    bin:selectedRow.bin,
-    action:qtyVal>0?"IN":"OUT",
-    qty:Math.abs(qtyVal),
-    stockAfter:newStock,
-    remark:remark.value||""
+window.saveEdit=async()=>{
+  await updateDoc(doc(db,"inventory",editId),{
+    name:e_name.value,
+    color:e_color.value,
+    size:e_size.value,
+    bin:e_bin.value,
+    price:+e_price.value
   });
+  await log("EDIT_PRODUCT",e_name.value,0);
+  closeEdit(); load();
+}
 
-  msg.innerText="Stock updated";
-  qty.value="";
-  remark.value="";
-  loadInventory();
+window.closeEdit=()=>editModal.style.display="none";
+
+window.remove=async(id,code)=>{
+  if(!confirm("Delete?"))return;
+  await deleteDoc(doc(db,"inventory",id));
+  await log("DELETE_PRODUCT",code,0);
+  load();
+}
+
+async function log(action,code,qty){
+  await addDoc(collection(db,"audit_logs"),{
+    action,code,qty,
+    staff:"admin",
+    time:serverTimestamp()
+  });
 }
 </script>
-
 </body>
 </html>
