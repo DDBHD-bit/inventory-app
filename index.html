@@ -18,28 +18,65 @@ button{padding:6px;border:none;border-radius:5px;cursor:pointer}
 .edit{background:#e3f2fd}
 .del{background:#fce4ec}
 .low{color:red;font-weight:bold}
-.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);justify-content:center;align-items:center}
+.modal{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.5);
+  justify-content:center;align-items:center;
+  z-index:999;
+}
 .modal-box{background:#fff;padding:15px;width:90%;max-width:400px;border-radius:8px}
 .modal-box input{width:100%;padding:8px;margin-bottom:8px}
+.center{text-align:center;margin-top:20px}
 </style>
 </head>
 
 <body>
 
-<h2>Inventory</h2>
-<input class="search" placeholder="Search..." oninput="search(this.value)">
-<div id="list" class="grid"></div>
+<!-- 🌐 PUBLIC VIEW -->
+<div id="publicView">
+  <h2>Product Search</h2>
+  <input class="search" placeholder="Search product..."
+         oninput="publicSearch(this.value)">
+  <div id="publicResults" class="grid"></div>
+
+  <div class="center">
+    <button onclick="showLogin()">🔐 Staff Login</button>
+  </div>
+</div>
+
+<!-- 🔐 STAFF VIEW -->
+<div id="staffView" style="display:none">
+  <h2>Inventory</h2>
+  <input class="search" placeholder="Search..."
+         oninput="search(this.value)">
+  <div id="list" class="grid"></div>
+
+  <div class="center">
+    <button onclick="logout()">Logout</button>
+  </div>
+</div>
+
+<!-- LOGIN MODAL -->
+<div id="loginModal" class="modal">
+  <div class="modal-box">
+    <h3>Staff Login</h3>
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <button onclick="closeLogin()">Cancel</button>
+  </div>
+</div>
 
 <!-- EDIT MODAL -->
 <div id="editModal" class="modal">
   <div class="modal-box">
     <h3>Edit Product</h3>
-    <input id="e_name">
-    <input id="e_color">
-    <input id="e_size">
-    <input id="e_bin">
-    <input id="e_price" type="number">
-    <button class="edit" onclick="saveEdit()">Save</button>
+    <input id="e_name" placeholder="Name">
+    <input id="e_color" placeholder="Color">
+    <input id="e_size" placeholder="Size">
+    <input id="e_bin" placeholder="Bin">
+    <input id="e_price" type="number" placeholder="Price">
+    <button onclick="saveEdit()">Save</button>
     <button onclick="closeEdit()">Cancel</button>
   </div>
 </div>
@@ -47,30 +84,35 @@ button{padding:6px;border:none;border-radius:5px;cursor:pointer}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
-  getFirestore, collection, getDocs, doc, updateDoc,
-  deleteDoc, addDoc, increment, serverTimestamp
+  getFirestore, collection, getDocs, doc,
+  updateDoc, deleteDoc, addDoc,
+  increment, serverTimestamp, getDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import {
+  getAuth, signInWithEmailAndPassword, signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-/* 🔑 PASTE YOUR FIREBASE CONFIG HERE */
+/* 🔑 REPLACE WITH YOUR FIREBASE CONFIG */
 const firebaseConfig = {
-  apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
-  authDomain: "inventory-app-9f7a3.firebaseapp.com",
-  projectId: "inventory-app-9f7a3"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 let products = [];
 let editId = null;
 
-/* TEMP ROLE (replace with Auth later) */
-localStorage.setItem("role","admin");
-
+/* 🔐 ROLE CHECK */
 function isAdmin(){
   return localStorage.getItem("role")==="admin";
 }
 
+/* LOAD INVENTORY */
 async function load(){
   const snap = await getDocs(collection(db,"inventory"));
   products = snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -78,6 +120,34 @@ async function load(){
 }
 load();
 
+/* 🌐 PUBLIC SEARCH */
+window.publicSearch = q=>{
+  q=q.toLowerCase();
+  publicResults.innerHTML="";
+  products
+    .filter(p=>p.name.toLowerCase().includes(q)||p.code.toLowerCase().includes(q))
+    .forEach(p=>{
+      publicResults.innerHTML+=`
+        <div class="card">
+          <h3>${p.name}</h3>
+          <span class="badge">${p.code}</span>
+          <span class="badge">${p.color}</span>
+          <span class="badge">${p.size}</span>
+        </div>`;
+    });
+};
+
+/* 🔐 STAFF SEARCH */
+window.search = q=>{
+  q=q.toLowerCase();
+  render(products.filter(p=>
+    p.name.toLowerCase().includes(q)||
+    p.code.toLowerCase().includes(q)||
+    p.color.toLowerCase().includes(q)
+  ));
+};
+
+/* RENDER STAFF VIEW */
 function render(data){
   list.innerHTML="";
   data.forEach(p=>{
@@ -108,24 +178,17 @@ function render(data){
   });
 }
 
-window.search=q=>{
-  q=q.toLowerCase();
-  render(products.filter(p=>
-    p.name.toLowerCase().includes(q)||
-    p.code.toLowerCase().includes(q)||
-    p.color.toLowerCase().includes(q)
-  ));
-}
-
-window.stock=async(id,code,d)=>{
-  const qty=+prompt("Qty?");
+/* STOCK IN / OUT */
+window.stock = async(id,code,d)=>{
+  const qty=+prompt("Enter quantity");
   if(!qty)return;
   await updateDoc(doc(db,"inventory",id),{stock:increment(d*qty)});
   await log(d>0?"STOCK_IN":"STOCK_OUT",code,qty);
   load();
-}
+};
 
-window.edit=async(id)=>{
+/* EDIT */
+window.edit = id=>{
   editId=id;
   const p=products.find(x=>x.id===id);
   e_name.value=p.name;
@@ -134,9 +197,9 @@ window.edit=async(id)=>{
   e_bin.value=p.bin;
   e_price.value=p.price;
   editModal.style.display="flex";
-}
+};
 
-window.saveEdit=async()=>{
+window.saveEdit = async()=>{
   await updateDoc(doc(db,"inventory",editId),{
     name:e_name.value,
     color:e_color.value,
@@ -146,25 +209,65 @@ window.saveEdit=async()=>{
   });
   await log("EDIT_PRODUCT",e_name.value,0);
   closeEdit(); load();
-}
+};
 
-window.closeEdit=()=>editModal.style.display="none";
+window.closeEdit = ()=>editModal.style.display="none";
 
-window.remove=async(id,code)=>{
-  if(!confirm("Delete?"))return;
+/* DELETE */
+window.remove = async(id,code)=>{
+  if(!confirm("Delete product?"))return;
   await deleteDoc(doc(db,"inventory",id));
   await log("DELETE_PRODUCT",code,0);
   load();
-}
+};
 
+/* AUDIT */
 async function log(action,code,qty){
   await addDoc(collection(db,"audit_logs"),{
     action,code,qty,
-    staff:"admin",
+    staff:localStorage.getItem("staff"),
     time:serverTimestamp()
   });
 }
+
+/* LOGIN */
+window.showLogin = ()=>loginModal.style.display="flex";
+window.closeLogin = ()=>loginModal.style.display="none";
+
+window.login = async()=>{
+  try{
+    const cred = await signInWithEmailAndPassword(
+      auth,email.value,password.value
+    );
+    const snap = await getDoc(doc(db,"users",cred.user.uid));
+    if(!snap.exists()||!snap.data().active){
+      alert("Access denied"); return;
+    }
+    localStorage.setItem("role",snap.data().role);
+    localStorage.setItem("staff",snap.data().name);
+    publicView.style.display="none";
+    staffView.style.display="block";
+    loginModal.style.display="none";
+  }catch{
+    alert("Invalid login");
+  }
+};
+
+/* LOGOUT */
+window.logout = async()=>{
+  await signOut(auth);
+  localStorage.clear();
+  staffView.style.display="none";
+  publicView.style.display="block";
+};
+
+/* AUTO SESSION */
+onAuthStateChanged(auth,user=>{
+  if(user){
+    publicView.style.display="none";
+    staffView.style.display="block";
+  }
+});
 </script>
 </body>
 </html>
-
