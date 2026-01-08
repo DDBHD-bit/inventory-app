@@ -1,39 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
 <title>Inventory App</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-
-<!-- QR -->
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
 
 <style>
 body{font-family:Arial;background:#f4f6f8;margin:0}
-header{background:#2563eb;color:#fff;padding:12px;font-size:18px}
+header{background:#2563eb;color:#fff;padding:12px;display:flex;justify-content:space-between}
 .container{padding:12px}
-.card{background:#fff;border-radius:10px;padding:12px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,.08)}
-input,button{padding:10px;border-radius:8px;border:1px solid #ccc;width:100%;margin-top:8px}
-button{background:#2563eb;color:#fff;border:none;font-weight:bold}
-button.secondary{background:#e5e7eb;color:#000}
+.card{background:#fff;padding:12px;border-radius:10px;margin-bottom:12px}
+input,select,button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:1px solid #ccc}
+button{background:#2563eb;color:#fff;border:none}
+.small{font-size:12px;color:#555}
 .product{display:flex;gap:10px}
 .product img{width:70px;height:70px;border-radius:8px;object-fit:cover}
-.badge{background:#e5e7eb;padding:3px 8px;border-radius:12px;font-size:12px}
-.stock-low{color:red;font-weight:bold}
-.actions button{width:auto;margin-right:6px}
+.low{color:red;font-weight:bold}
 .hidden{display:none}
+.actions button{width:auto;margin-right:6px}
 </style>
 </head>
 
 <body>
 
-<header>Inventory Manager</header>
+<header>
+  <b>Inventory</b>
+  <button onclick="logout()">Logout</button>
+</header>
 
 <!-- LOGIN -->
 <div class="container" id="loginBox">
@@ -47,135 +46,122 @@ button.secondary{background:#e5e7eb;color:#000}
 
 <!-- APP -->
 <div class="container hidden" id="appBox">
-
-  <input id="search" placeholder="Search product" oninput="loadProducts()">
-
+  <input id="search" placeholder="Search name / code / color / size" oninput="loadProducts()">
   <button onclick="showAdd()">➕ Add Product</button>
-
   <div id="products"></div>
-
 </div>
 
 <!-- ADD PRODUCT -->
 <div class="container hidden" id="addBox">
   <div class="card">
     <h3>Add Product</h3>
-    <input id="pname" placeholder="Product Name">
-    <input id="pcode" placeholder="Product Code">
+    <input id="pname" placeholder="Name">
+    <input id="pcode" placeholder="Code">
+    <input id="pcolor" placeholder="Color (eg Blue)">
+    <input id="psize" placeholder="Size (eg M / L / XL)">
     <input id="pprice" type="number" placeholder="Price">
     <input id="pstock" type="number" placeholder="Stock">
-    <input type="file" accept="image/*" capture="environment" id="pimage">
+    <input type="file" id="pimage" accept="image/*" capture="environment">
     <button onclick="addProduct()">Save</button>
-    <button class="secondary" onclick="hideAdd()">Cancel</button>
+    <button onclick="hideAdd()">Cancel</button>
   </div>
 </div>
 
-
 <script>
-/* FIREBASE INIT */
 firebase.initializeApp({
-  apiKey:"AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
-  authDomain:"inventory-app-9f7a3.firebaseapp.com",
-  projectId:"inventory-app-9f7a3",
-  storageBucket:"inventory-app-9f7a3.firebasestorage.app"
+  apiKey:"YOUR_API_KEY",
+  authDomain:"YOUR_PROJECT.firebaseapp.com",
+  projectId:"YOUR_PROJECT_ID",
+  storageBucket:"YOUR_PROJECT.appspot.com"
 });
 
-const auth = firebase.auth();
-const db = firebase.firestore();
-const storage = firebase.storage();
-
-/* AUTH */
-function login(){
-  auth.signInWithEmailAndPassword(
-    email.value,password.value
-  ).catch(e=>alert(e.message));
-}
+const auth=firebase.auth();
+const db=firebase.firestore();
+const storage=firebase.storage();
 
 auth.onAuthStateChanged(u=>{
-  if(u){
-    loginBox.classList.add("hidden");
-    appBox.classList.remove("hidden");
-    loadProducts();
-  }
+  loginBox.classList.toggle("hidden",!!u);
+  appBox.classList.toggle("hidden",!u);
+  if(u) loadProducts();
 });
 
-/* UI */
+function login(){
+  auth.signInWithEmailAndPassword(email.value,password.value)
+  .catch(e=>alert(e.message));
+}
+
+function logout(){ auth.signOut(); }
+
 function showAdd(){ addBox.classList.remove("hidden"); }
 function hideAdd(){ addBox.classList.add("hidden"); }
 
-/* IMAGE COMPRESSION */
 function compress(file){
-  return new Promise(res=>{
-    const img=new Image();
-    img.onload=()=>{
+  return new Promise(r=>{
+    const i=new Image();
+    i.onload=()=>{
       const c=document.createElement("canvas");
-      c.width=600;
-      c.height=600*(img.height/img.width);
-      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
-      c.toBlob(b=>res(b),"image/jpeg",0.7);
-    }
-    img.src=URL.createObjectURL(file);
+      c.width=600; c.height=600*(i.height/i.width);
+      c.getContext("2d").drawImage(i,0,0,c.width,c.height);
+      c.toBlob(b=>r(b),"image/jpeg",0.7);
+    };
+    i.src=URL.createObjectURL(file);
   });
 }
 
-/* ADD PRODUCT */
 async function addProduct(){
-  let file=pimage.files[0];
-  let blob=await compress(file);
-  let ref=storage.ref("products/"+Date.now()+".jpg");
+  const blob=await compress(pimage.files[0]);
+  const ref=storage.ref("products/"+Date.now()+".jpg");
   await ref.put(blob);
-  let url=await ref.getDownloadURL();
+  const url=await ref.getDownloadURL();
 
   await db.collection("products").add({
     name:pname.value,
     code:pcode.value,
+    color:pcolor.value,
+    size:psize.value,
     price:+pprice.value,
     stock:+pstock.value,
-    image:url
+    image:url,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
   });
 
-  hideAdd();
-  loadProducts();
+  hideAdd(); loadProducts();
 }
 
-/* LOAD PRODUCTS */
 async function loadProducts(){
   products.innerHTML="";
-  let q=search.value.toLowerCase();
-  let snap=await db.collection("products").get();
+  const q=search.value.toLowerCase();
+  const snap=await db.collection("products").get();
 
   snap.forEach(d=>{
-    let p=d.data();
-    if(q && !p.name.toLowerCase().includes(q) && !p.code.includes(q)) return;
+    const p=d.data();
+    const text=(p.name+p.code+p.color+p.size).toLowerCase();
+    if(q && !text.includes(q)) return;
 
-    let div=document.createElement("div");
+    const div=document.createElement("div");
     div.className="card product";
     div.innerHTML=`
       <img src="${p.image}">
       <div>
-        <b>${p.name}</b><br>
-        <span class="badge">${p.code}</span><br>
+        <b>${p.name}</b> (${p.color}, ${p.size})<br>
+        <span class="small">${p.code}</span><br>
         ₹${p.price}<br>
-        <span class="${p.stock<5?'stock-low':''}">
-          Stock: ${p.stock}
-        </span>
+        <span class="${p.stock<5?'low':''}">Stock: ${p.stock}</span>
         <div class="actions">
           <button onclick="updateStock('${d.id}',1)">IN</button>
           <button onclick="updateStock('${d.id}',-1)">OUT</button>
         </div>
         <div id="qr${d.id}"></div>
-      </div>
-    `;
+      </div>`;
     products.appendChild(div);
     new QRCode("qr"+d.id,p.code);
   });
 }
 
-/* STOCK UPDATE */
-async function updateStock(id,delta){
-  let ref=db.collection("products").doc(id);
-  let doc=await ref.get();
-  ref.update({stock:doc.data().stock+delta});
+async function updateStock(id,d){
+  const ref=db.collection("products").doc(id);
+  const doc=await ref.get();
+  ref.update({stock:doc.data().stock+d});
   loadProducts();
 }
 </script>
