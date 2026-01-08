@@ -238,25 +238,59 @@ async function uploadToCloudinary(file){
 }
 
 // ➕ Add product
-async function addProduct(){
-  if(!pimage.files[0]) return alert("Image required");
+window.addProduct = async function () {
+  if (!pimage.files[0]) return alert("Image required");
 
+  const code = pcode.value.trim();
+  const color = pcolor.value.trim();
+  const size = psize.value.trim();
+  const qty = Number(pstock.value);
+
+  if (!code || !color || !size || !qty) {
+    return alert("Code, Color, Size & Stock are mandatory");
+  }
+
+  const q = await db.collection("products")
+    .where("code", "==", code)
+    .where("color", "==", color)
+    .where("size", "==", size)
+    .limit(1)
+    .get();
+
+  // 📦 Variant exists → MERGE STOCK
+  if (!q.empty) {
+    const doc = q.docs[0];
+    const oldStock = doc.data().stock || 0;
+
+    await doc.ref.update({
+      stock: oldStock + qty,
+      price: +pprice.value || doc.data().price,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    hideAdd();
+    loadProducts();
+    return alert("Stock updated for existing product");
+  }
+
+  // 🆕 New variant
   const imageUrl = await uploadToCloudinary(pimage.files[0]);
 
-  await db.collection("inventory").add({
-    name:pname.value,
-    code:pcode.value,
-    color:pcolor.value,
-    size:psize.value,
-    price:+pprice.value,
-    stock:+pstock.value,
-    image:imageUrl,
+  await db.collection("products").add({
+    code,
+    name: pname.value,
+    color,
+    size,
+    price: +pprice.value,
+    stock: qty,
+    image: imageUrl,
     createdAt: firebase.firestore.FieldValue.serverTimestamp()
   });
 
   hideAdd();
   loadProducts();
-}
+};
+
 
 // 📦 Load products
 async function loadProducts(){
@@ -303,5 +337,6 @@ async function updateStock(id,delta){
 
 </body>
 </html>
+
 
 
