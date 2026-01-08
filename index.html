@@ -11,28 +11,35 @@
 
 <style>
 body { font-family: Arial; background:#f2f2f2; margin:0; padding:12px }
-header { display:flex; justify-content:space-between; align-items:center }
 button { padding:6px 10px; border:none; background:#007bff; color:white; border-radius:6px; cursor:pointer }
 button.red { background:#dc3545 }
 .hidden { display:none }
-
 .card { background:white; padding:12px; margin-top:12px; border-radius:10px; box-shadow:0 4px 8px rgba(0,0,0,.08) }
 .variant { background:#f7f7f7; padding:6px; margin-top:6px; border-radius:6px }
 .color { font-weight:bold }
 .sizeRow { display:flex; justify-content:space-between; margin-top:4px }
-
-.modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center }
+.modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:9999 }
 .modalInner { background:white; padding:14px; border-radius:10px; width:320px; max-height:90%; overflow:auto }
-
 table { width:100%; border-collapse:collapse; font-size:13px }
 th,td { border:1px solid #ccc; padding:6px; text-align:center }
 th { background:#eee }
-input { width:100%; padding:6px; margin-bottom:6px; }
+input { width:100%; padding:6px; margin-bottom:6px }
 img.prodImg { width:80px; border-radius:6px; margin-bottom:6px }
 </style>
 </head>
 
 <body>
+
+<!-- LOGIN BOX -->
+<div id="loginBox">
+  <h3>Login</h3>
+  <input id="email" type="email" placeholder="Email"><br>
+  <input id="password" type="password" placeholder="Password"><br>
+  <button onclick="login()">Login</button>
+</div>
+
+<!-- MAIN APP (hidden until login) -->
+<div id="appUI" class="hidden">
 
 <header>
   <h3>Inventory</h3>
@@ -99,13 +106,12 @@ img.prodImg { width:80px; border-radius:6px; margin-bottom:6px }
 </div>
 
 <script>
-// 🔥 Firebase config (replace with your project)
+// 🔥 Firebase config (replace)
 firebase.initializeApp({
   apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
   authDomain: "inventory-app-9f7a3.firebaseapp.com",
   projectId: "inventory-app-9f7a3"
 });
-
 const auth = firebase.auth();
 const db = firebase.firestore();
 
@@ -113,13 +119,25 @@ const db = firebase.firestore();
 const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dahxnopuw/image/upload";
 const CLOUDINARY_PRESET = "inventory_unsigned";
 
-// GLOBAL VARS
+// GLOBALS
 let USER_ROLE = "staff";
 let ALL_DATA = {};
 
+// LOGIN
+function login(){
+  const email = document.getElementById("email").value;
+  const pwd = document.getElementById("password").value;
+  auth.signInWithEmailAndPassword(email,pwd).catch(e=>alert(e.message));
+}
+
 // AUTH + ROLE
-auth.onAuthStateChanged(async user => {
+auth.onAuthStateChanged(async user=>{
   if(!user) return;
+
+  // hide login
+  loginBox.classList.add("hidden");
+  appUI.classList.remove("hidden");
+
   const doc = await db.collection("users").doc(user.uid).get();
   USER_ROLE = doc.exists?doc.data().role:"staff";
 
@@ -150,7 +168,7 @@ async function loadInventory(){
   render(ALL_DATA);
 }
 
-// RENDER INVENTORY
+// RENDER
 function render(data){
   list.innerHTML="";
   Object.values(data).forEach(p=>{
@@ -160,22 +178,19 @@ function render(data){
       Object.entries(sizes).forEach(([size,qty])=>{
         vhtml+=`<div class="sizeRow">
           <span>Size ${size}: <b>${qty}</b></span>
-          ${USER_ROLE==="admin"?
-            `<span>
+          ${USER_ROLE==="admin"?`<span>
               <button onclick="stockChange('${p.code}','${color}','${size}',1)">+</button>
               <button onclick="stockChange('${p.code}','${color}','${size}',-1)">-</button>
-            </span>`:""}
+          </span>`:""}
         </div>`;
       });
       vhtml+="</div>";
     });
 
-    list.innerHTML+=`
-      <div class="card">
-        ${p.image?`<img src="${p.image}" class="prodImg">`:""}
-        <b>${p.code}</b><br>${p.name}
-        ${vhtml}
-      </div>`;
+    list.innerHTML+=`<div class="card">
+      ${p.image?`<img src="${p.image}" class="prodImg">`:""}
+      <b>${p.code}</b><br>${p.name}${vhtml}
+    </div>`;
   });
 }
 
@@ -189,16 +204,14 @@ function filter(){
   render(f);
 }
 
-// STOCK IN/OUT + AUDIT
+// STOCK CHANGE + AUDIT
 async function stockChange(code,color,size,delta){
   const q = await db.collection("inventory").where("code","==",code)
     .where("color","==",color).where("size","==",size).limit(1).get();
   if(q.empty) return;
-
   const doc = q.docs[0];
   const newStock = Math.max(0,(doc.data().stock||0)+delta);
   await doc.ref.update({stock:newStock});
-
   await db.collection("audit_logs").add({
     code,color,size,
     action: delta>0?"IN":"OUT",
@@ -206,17 +219,16 @@ async function stockChange(code,color,size,delta){
     by: USER_ROLE,
     time: firebase.firestore.FieldValue.serverTimestamp()
   });
-
   loadInventory();
 }
 
 // ADD PRODUCT
 async function uploadImage(file){
   if(!file) return "";
-  const fd=new FormData();
+  const fd = new FormData();
   fd.append("file",file);
   fd.append("upload_preset",CLOUDINARY_PRESET);
-  const r=await fetch(CLOUDINARY_URL,{method:"POST",body:fd});
+  const r = await fetch(CLOUDINARY_URL,{method:"POST",body:fd});
   return (await r.json()).secure_url;
 }
 
@@ -255,11 +267,10 @@ async function loadAudit(){
   snap.forEach(d=>{
     const a=d.data();
     const t = a.time?a.time.toDate().toLocaleString():"";
-    tbody.innerHTML+=`
-      <tr>
-        <td>${t}</td><td>${a.code}</td><td>${a.color}</td>
-        <td>${a.size}</td><td>${a.action}</td><td>${a.qty}</td><td>${a.by}</td>
-      </tr>`;
+    tbody.innerHTML+=`<tr>
+      <td>${t}</td><td>${a.code}</td><td>${a.color}</td>
+      <td>${a.size}</td><td>${a.action}</td><td>${a.qty}</td><td>${a.by}</td>
+    </tr>`;
   });
   if(!tbody.innerHTML) tbody.innerHTML="<tr><td colspan='7'>No logs</td></tr>";
 }
@@ -288,15 +299,15 @@ async function loadSummary(dateStr){
   tbody.innerHTML="";
   Object.values(map).forEach(r=>{
     const net=r.in-r.out;
-    tbody.innerHTML+=`
-      <tr>
-        <td>${r.code}</td><td>${r.color}</td><td>${r.size}</td>
-        <td style="color:green">${r.in}</td><td style="color:red">${r.out}</td>
-        <td><b>${net>0?"+":""}${net}</b></td>
-      </tr>`;
+    tbody.innerHTML+=`<tr>
+      <td>${r.code}</td><td>${r.color}</td><td>${r.size}</td>
+      <td style="color:green">${r.in}</td><td style="color:red">${r.out}</td>
+      <td><b>${net>0?"+":""}${net}</b></td>
+    </tr>`;
   });
   if(!tbody.innerHTML) tbody.innerHTML="<tr><td colspan='6'>No activity</td></tr>";
 }
 </script>
+
 </body>
 </html>
