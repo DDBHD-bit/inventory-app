@@ -173,14 +173,32 @@ auth.onAuthStateChanged(user=>{
   if(user) loadProducts();
 });
 
-function login(){
-  auth.signInWithEmailAndPassword(email.value, password.value)
-    .catch(e=>alert(e.message));
-}
+// 🔐 AUTH FUNCTIONS (GLOBAL)
 
-function logout(){
+window.login = function () {
+  const emailVal = document.getElementById("email").value;
+  const passVal = document.getElementById("password").value;
+
+  auth.signInWithEmailAndPassword(emailVal, passVal)
+    .catch(err => alert(err.message));
+};
+
+window.logout = function () {
   auth.signOut();
-}
+};
+
+// 📦 MODAL CONTROL
+
+window.showAdd = function () {
+  document.getElementById("addBox").classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+};
+
+window.hideAdd = function () {
+  document.getElementById("addBox").classList.add("hidden");
+  document.body.style.overflow = "auto";
+};
+
 
 // 📷 Image compression
 function compressImage(file){
@@ -280,18 +298,10 @@ async function updateStock(id,delta){
   loadProducts();
 }
 
-// 🧩 Modal control (FINAL)
-function showAdd(){
-  addBox.classList.remove("hidden");
-  document.body.style.overflow="hidden";
-}
 
-function hideAdd(){
-  addBox.classList.add("hidden");
-  document.body.style.overflow="auto";
-}
 </script>
 
 </body>
 </html>
+
 
