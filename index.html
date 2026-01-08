@@ -225,7 +225,7 @@ async function addProduct(){
 
   const imageUrl = await uploadToCloudinary(pimage.files[0]);
 
-  await db.collection("products").add({
+  await db.collection("inventory").add({
     name:pname.value,
     code:pcode.value,
     color:pcolor.value,
@@ -245,7 +245,7 @@ async function loadProducts(){
   products.innerHTML="";
   const q=search.value.toLowerCase();
 
-  const snap=await db.collection("products").get();
+  const snap=await db.collection("inventory").get();
 
   snap.forEach(d=>{
     const p=d.data();
@@ -274,7 +274,7 @@ async function loadProducts(){
 }
 
 async function updateStock(id,delta){
-  const ref=db.collection("products").doc(id);
+  const ref=db.collection("inventory").doc(id);
   const doc=await ref.get();
   await ref.update({ stock: doc.data().stock + delta });
   loadProducts();
@@ -294,3 +294,4 @@ function hideAdd(){
 
 </body>
 </html>
+
