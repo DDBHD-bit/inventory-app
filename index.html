@@ -1,277 +1,183 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Inventory App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+<!-- QR -->
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
 
 <style>
-body{font-family:Arial;background:#f4f6f8;padding:15px}
-.search{width:100%;padding:10px;font-size:16px;margin-bottom:12px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:15px}
-.card{background:#fff;padding:12px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.1)}
-.card img{width:100%;height:160px;object-fit:cover;border-radius:6px}
-.badge{background:#eee;padding:3px 8px;border-radius:12px;font-size:12px;margin-right:4px}
-.actions{display:flex;gap:6px;margin-top:8px}
-button{padding:6px 10px;border:none;border-radius:5px;cursor:pointer}
-.in{background:#e8f5e9}
-.out{background:#ffebee}
-.edit{background:#e3f2fd}
-.del{background:#fce4ec}
-.low{color:red;font-weight:bold}
-.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);justify-content:center;align-items:center;z-index:999}
-.modal-box{background:#fff;padding:15px;width:90%;max-width:420px;border-radius:8px}
-.modal-box input{width:100%;padding:8px;margin-bottom:8px}
-.center{text-align:center;margin-top:15px}
+body{font-family:Arial;background:#f4f6f8;margin:0}
+header{background:#2563eb;color:#fff;padding:12px;font-size:18px}
+.container{padding:12px}
+.card{background:#fff;border-radius:10px;padding:12px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+input,button{padding:10px;border-radius:8px;border:1px solid #ccc;width:100%;margin-top:8px}
+button{background:#2563eb;color:#fff;border:none;font-weight:bold}
+button.secondary{background:#e5e7eb;color:#000}
+.product{display:flex;gap:10px}
+.product img{width:70px;height:70px;border-radius:8px;object-fit:cover}
+.badge{background:#e5e7eb;padding:3px 8px;border-radius:12px;font-size:12px}
+.stock-low{color:red;font-weight:bold}
+.actions button{width:auto;margin-right:6px}
+.hidden{display:none}
 </style>
 </head>
 
 <body>
 
-<!-- 🌐 PUBLIC SEARCH -->
-<div id="publicView">
-  <h2>Product Search</h2>
-  <input class="search" placeholder="Search product..."
-         oninput="publicSearch(this.value)">
-  <div id="publicResults" class="grid"></div>
-  <div class="center">
-    <button onclick="showLogin()">🔐 Staff Login</button>
-  </div>
-</div>
-
-<!-- 🔐 STAFF VIEW -->
-<div id="staffView" style="display:none">
-  <h2>Inventory</h2>
-
-  <div id="adminBar" style="display:none;margin-bottom:10px">
-    <button onclick="openAdd()">➕ Add Product</button>
-  </div>
-
-  <input class="search" placeholder="Search..."
-         oninput="search(this.value)">
-  <div id="list" class="grid"></div>
-
-  <div class="center">
-    <button onclick="logout()">Logout</button>
-  </div>
-</div>
+<header>Inventory Manager</header>
 
 <!-- LOGIN -->
-<div id="loginModal" class="modal">
-  <div class="modal-box">
-    <h3>Staff Login</h3>
+<div class="container" id="loginBox">
+  <div class="card">
+    <h3>Login</h3>
     <input id="email" placeholder="Email">
     <input id="password" type="password" placeholder="Password">
     <button onclick="login()">Login</button>
-    <button onclick="closeLogin()">Cancel</button>
   </div>
+</div>
+
+<!-- APP -->
+<div class="container hidden" id="appBox">
+
+  <input id="search" placeholder="Search product" oninput="loadProducts()">
+
+  <button onclick="showAdd()">➕ Add Product</button>
+
+  <div id="products"></div>
+
 </div>
 
 <!-- ADD PRODUCT -->
-<div id="addModal" class="modal">
-  <div class="modal-box">
+<div class="container hidden" id="addBox">
+  <div class="card">
     <h3>Add Product</h3>
-    <input id="a_code" placeholder="Code">
-    <input id="a_name" placeholder="Name">
-    <input id="a_color" placeholder="Color">
-    <input id="a_size" placeholder="Size">
-    <input id="a_bin" placeholder="Bin">
-    <input id="a_price" type="number" placeholder="Price">
-    <input id="a_stock" type="number" placeholder="Opening Stock">
-    <input id="a_image" type="file" accept="image/*" capture="environment">
-    <button onclick="saveProduct()">Save</button>
-    <button onclick="closeAdd()">Cancel</button>
+    <input id="pname" placeholder="Product Name">
+    <input id="pcode" placeholder="Product Code">
+    <input id="pprice" type="number" placeholder="Price">
+    <input id="pstock" type="number" placeholder="Stock">
+    <input type="file" accept="image/*" capture="environment" id="pimage">
+    <button onclick="addProduct()">Save</button>
+    <button class="secondary" onclick="hideAdd()">Cancel</button>
   </div>
 </div>
 
-<!-- EDIT -->
-<div id="editModal" class="modal">
-  <div class="modal-box">
-    <h3>Edit Product</h3>
-    <input id="e_name" placeholder="Name">
-    <input id="e_color" placeholder="Color">
-    <input id="e_size" placeholder="Size">
-    <input id="e_bin" placeholder="Bin">
-    <input id="e_price" type="number" placeholder="Price">
-    <button onclick="saveEdit()">Save</button>
-    <button onclick="closeEdit()">Cancel</button>
-  </div>
-</div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs, addDoc, doc,
-  updateDoc, deleteDoc, increment, serverTimestamp, getDoc
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getStorage, ref, uploadBytes, getDownloadURL }
-from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+<script>
+/* FIREBASE INIT */
+firebase.initializeApp({
+  apiKey:"AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
+  authDomain:"inventory-app-9f7a3.firebaseapp.com",
+  projectId:"inventory-app-9f7a3",
+  storageBucket:"inventory-app-9f7a3.firebasestorage.app"
+});
 
-/* 🔑 REPLACE WITH YOUR CONFIG */
-const firebaseConfig = {
-  apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
-  authDomain: "inventory-app-9f7a3.firebaseapp.com",
-  projectId: "inventory-app-9f7a3"
-};
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
-const storage = getStorage(app);
+/* AUTH */
+function login(){
+  auth.signInWithEmailAndPassword(
+    email.value,password.value
+  ).catch(e=>alert(e.message));
+}
 
-let products=[], editId=null;
+auth.onAuthStateChanged(u=>{
+  if(u){
+    loginBox.classList.add("hidden");
+    appBox.classList.remove("hidden");
+    loadProducts();
+  }
+});
+
+/* UI */
+function showAdd(){ addBox.classList.remove("hidden"); }
+function hideAdd(){ addBox.classList.add("hidden"); }
 
 /* IMAGE COMPRESSION */
-async function compressImage(file, maxWidth=1024, quality=0.7){
-  return new Promise(resolve=>{
-    const img=new Image(), reader=new FileReader();
-    reader.onload=e=>img.src=e.target.result;
+function compress(file){
+  return new Promise(res=>{
+    const img=new Image();
     img.onload=()=>{
-      let w=img.width, h=img.height;
-      if(w>maxWidth){ h=h*(maxWidth/w); w=maxWidth; }
       const c=document.createElement("canvas");
-      c.width=w; c.height=h;
-      c.getContext("2d").drawImage(img,0,0,w,h);
-      c.toBlob(b=>resolve(b),"image/jpeg",quality);
-    };
-    reader.readAsDataURL(file);
+      c.width=600;
+      c.height=600*(img.height/img.width);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      c.toBlob(b=>res(b),"image/jpeg",0.7);
+    }
+    img.src=URL.createObjectURL(file);
   });
 }
 
-/* ROLE */
-function isAdmin(){ return localStorage.getItem("role")==="admin"; }
+/* ADD PRODUCT */
+async function addProduct(){
+  let file=pimage.files[0];
+  let blob=await compress(file);
+  let ref=storage.ref("products/"+Date.now()+".jpg");
+  await ref.put(blob);
+  let url=await ref.getDownloadURL();
 
-/* LOAD */
-async function load(){
-  const snap=await getDocs(collection(db,"inventory"));
-  products=snap.docs.map(d=>({id:d.id,...d.data()}));
-  render(products);
+  await db.collection("products").add({
+    name:pname.value,
+    code:pcode.value,
+    price:+pprice.value,
+    stock:+pstock.value,
+    image:url
+  });
+
+  hideAdd();
+  loadProducts();
 }
-load();
 
-/* PUBLIC SEARCH */
-window.publicSearch=q=>{
-  q=q.toLowerCase(); publicResults.innerHTML="";
-  products.filter(p=>p.name.toLowerCase().includes(q)||p.code.toLowerCase().includes(q))
-    .forEach(p=>publicResults.innerHTML+=`
-      <div class="card"><h3>${p.name}</h3>
-      <span class="badge">${p.code}</span>
-      <span class="badge">${p.color}</span></div>`);
-};
+/* LOAD PRODUCTS */
+async function loadProducts(){
+  products.innerHTML="";
+  let q=search.value.toLowerCase();
+  let snap=await db.collection("products").get();
 
-/* STAFF SEARCH */
-window.search=q=>{
-  q=q.toLowerCase();
-  render(products.filter(p=>p.name.toLowerCase().includes(q)||p.code.toLowerCase().includes(q)));
-};
+  snap.forEach(d=>{
+    let p=d.data();
+    if(q && !p.name.toLowerCase().includes(q) && !p.code.includes(q)) return;
 
-/* RENDER */
-function render(data){
-  list.innerHTML="";
-  data.forEach(p=>{
-    list.innerHTML+=`
-    <div class="card">
-      <img src="${p.image||'https://via.placeholder.com/300'}">
-      <h3>${p.name}</h3>
+    let div=document.createElement("div");
+    div.className="card product";
+    div.innerHTML=`
+      <img src="${p.image}">
       <div>
-        <span class="badge">${p.code}</span>
-        <span class="badge">${p.color}</span>
-        <span class="badge">${p.size}</span>
+        <b>${p.name}</b><br>
+        <span class="badge">${p.code}</span><br>
+        ₹${p.price}<br>
+        <span class="${p.stock<5?'stock-low':''}">
+          Stock: ${p.stock}
+        </span>
+        <div class="actions">
+          <button onclick="updateStock('${d.id}',1)">IN</button>
+          <button onclick="updateStock('${d.id}',-1)">OUT</button>
+        </div>
+        <div id="qr${d.id}"></div>
       </div>
-      <div>Bin: ${p.bin}</div>
-      <div class="${p.stock<5?'low':''}">Stock: ${p.stock}</div>
-      <b>₹${p.price}</b>
-      <div class="actions">
-        <button class="in" onclick="stock('${p.id}',1)">IN</button>
-        <button class="out" onclick="stock('${p.id}',-1)">OUT</button>
-      </div>
-      ${isAdmin()?`
-      <div class="actions">
-        <button class="edit" onclick="edit('${p.id}')">Edit</button>
-        <button class="del" onclick="remove('${p.id}','${p.code}')">Delete</button>
-      </div>`:""}
-    </div>`;
+    `;
+    products.appendChild(div);
+    new QRCode("qr"+d.id,p.code);
   });
 }
 
-/* STOCK */
-window.stock=async(id,d)=>{
-  const q=+prompt("Qty"); if(!q)return;
-  await updateDoc(doc(db,"inventory",id),{stock:increment(d*q)});
-  await addDoc(collection(db,"audit_logs"),{action:d>0?"IN":"OUT",qty:q,time:serverTimestamp()});
-  load();
-};
-
-/* ADD */
-window.openAdd=()=>addModal.style.display="flex";
-window.closeAdd=()=>addModal.style.display="none";
-
-window.saveProduct=async()=>{
-  let imgURL="";
-  if(a_image.files.length){
-    const blob=await compressImage(a_image.files[0]);
-    const refImg=ref(storage,"products/"+Date.now()+".jpg");
-    await uploadBytes(refImg,blob);
-    imgURL=await getDownloadURL(refImg);
-  }
-  await addDoc(collection(db,"inventory"),{
-    code:a_code.value,name:a_name.value,color:a_color.value,
-    size:a_size.value,bin:a_bin.value,price:+a_price.value,
-    stock:+a_stock.value,image:imgURL,createdAt:serverTimestamp()
-  });
-  closeAdd(); load();
-};
-
-/* EDIT */
-window.edit=id=>{
-  editId=id;
-  const p=products.find(x=>x.id===id);
-  e_name.value=p.name; e_color.value=p.color;
-  e_size.value=p.size; e_bin.value=p.bin;
-  e_price.value=p.price;
-  editModal.style.display="flex";
-};
-window.saveEdit=async()=>{
-  await updateDoc(doc(db,"inventory",editId),{
-    name:e_name.value,color:e_color.value,size:e_size.value,
-    bin:e_bin.value,price:+e_price.value
-  });
-  closeEdit(); load();
-};
-window.closeEdit=()=>editModal.style.display="none";
-
-/* DELETE */
-window.remove=async(id)=>{
-  if(confirm("Delete?")){
-    await deleteDoc(doc(db,"inventory",id)); load();
-  }
-};
-
-/* LOGIN */
-window.showLogin=()=>loginModal.style.display="flex";
-window.closeLogin=()=>loginModal.style.display="none";
-
-window.login=async()=>{
-  const c=await signInWithEmailAndPassword(auth,email.value,password.value);
-  const snap=await getDoc(doc(db,"users",c.user.uid));
-  localStorage.setItem("role",snap.data().role);
-  publicView.style.display="none";
-  staffView.style.display="block";
-  if(isAdmin()) adminBar.style.display="block";
-  loginModal.style.display="none";
-};
-
-window.logout=async()=>{
-  await signOut(auth);
-  localStorage.clear();
-  staffView.style.display="none";
-  publicView.style.display="block";
-};
-
-onAuthStateChanged(auth,u=>{
-  if(u){ staffView.style.display="block"; publicView.style.display="none"; }
-});
+/* STOCK UPDATE */
+async function updateStock(id,delta){
+  let ref=db.collection("products").doc(id);
+  let doc=await ref.get();
+  ref.update({stock:doc.data().stock+delta});
+  loadProducts();
+}
 </script>
 </body>
 </html>
-
