@@ -18,19 +18,22 @@ button.red { background:#dc3545 }
 .variant { background:#f7f7f7; padding:6px; margin-top:6px; border-radius:6px }
 .color { font-weight:bold }
 .sizeRow { display:flex; justify-content:space-between; margin-top:4px }
-.modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:9999 }
+.modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:10000 }
 .modalInner { background:white; padding:14px; border-radius:10px; width:320px; max-height:90%; overflow:auto }
 table { width:100%; border-collapse:collapse; font-size:13px }
 th,td { border:1px solid #ccc; padding:6px; text-align:center }
 th { background:#eee }
 input { width:100%; padding:6px; margin-bottom:6px }
 img.prodImg { width:80px; border-radius:6px; margin-bottom:6px }
+
+#loginBox { z-index:9999; position:relative; background:#fff; padding:20px; border-radius:8px; max-width:300px; margin:100px auto; box-shadow:0 4px 8px rgba(0,0,0,.2) }
+#appUI { display:flex; flex-direction:column; }
 </style>
 </head>
 
 <body>
 
-<!-- LOGIN BOX -->
+<!-- LOGIN -->
 <div id="loginBox">
   <h3>Login</h3>
   <input id="email" type="email" placeholder="Email"><br>
@@ -38,7 +41,7 @@ img.prodImg { width:80px; border-radius:6px; margin-bottom:6px }
   <button onclick="login()">Login</button>
 </div>
 
-<!-- MAIN APP (hidden until login) -->
+<!-- MAIN APP -->
 <div id="appUI" class="hidden">
 
 <header>
@@ -55,58 +58,65 @@ img.prodImg { width:80px; border-radius:6px; margin-bottom:6px }
 
 <div id="list"></div>
 
-<!-- ADD PRODUCT MODAL -->
-<div id="addBox" class="modal hidden">
-  <div class="modalInner">
-    <h3>Add Product</h3>
-    <input id="pCode" placeholder="Code">
-    <input id="pName" placeholder="Name">
-    <input id="pColor" placeholder="Color">
-    <input id="pSize" placeholder="Size">
-    <input id="pStock" type="number" placeholder="Stock">
-    <input type="file" id="pImage" accept="image/*" capture="environment">
-    <button onclick="addProduct()">Save Product</button>
-    <button class="red" onclick="hideAdd()">Cancel</button>
-  </div>
-</div>
+<!-- MODALS CONTAINER -->
+<div id="modalsContainer">
 
-<!-- AUDIT LOG MODAL -->
-<div id="auditBox" class="modal hidden">
-  <div class="modalInner">
-    <h3>Audit Logs</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Date</th><th>Code</th><th>Color</th><th>Size</th><th>Action</th><th>Qty</th><th>By</th>
-        </tr>
-      </thead>
-      <tbody id="auditBody"></tbody>
-    </table>
-    <br>
-    <button class="red" onclick="closeAudit()">Close</button>
+  <!-- ADD PRODUCT MODAL -->
+  <div id="addBox" class="modal hidden">
+    <div class="modalInner">
+      <h3>Add Product</h3>
+      <input id="pCode" placeholder="Code">
+      <input id="pName" placeholder="Name">
+      <input id="pColor" placeholder="Color">
+      <input id="pSize" placeholder="Size">
+      <input id="pStock" type="number" placeholder="Stock">
+      <input type="file" id="pImage" accept="image/*" capture="environment">
+      <button onclick="addProduct()">Save Product</button>
+      <button class="red" onclick="hideAdd()">Cancel</button>
+    </div>
   </div>
-</div>
 
-<!-- DAILY SUMMARY MODAL -->
-<div id="summaryBox" class="modal hidden">
-  <div class="modalInner">
-    <h3>Daily Stock Movement</h3>
-    <input type="date" id="summaryDate">
-    <table>
-      <thead>
-        <tr>
-          <th>Code</th><th>Color</th><th>Size</th><th>IN</th><th>OUT</th><th>NET</th>
-        </tr>
-      </thead>
-      <tbody id="summaryBody"></tbody>
-    </table>
-    <br>
-    <button onclick="closeSummary()">Close</button>
+  <!-- AUDIT LOG MODAL -->
+  <div id="auditBox" class="modal hidden">
+    <div class="modalInner">
+      <h3>Audit Logs</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Code</th><th>Color</th><th>Size</th><th>Action</th><th>Qty</th><th>By</th>
+          </tr>
+        </thead>
+        <tbody id="auditBody"></tbody>
+      </table>
+      <br>
+      <button class="red" onclick="closeAudit()">Close</button>
+    </div>
   </div>
-</div>
+
+  <!-- DAILY SUMMARY MODAL -->
+  <div id="summaryBox" class="modal hidden">
+    <div class="modalInner">
+      <h3>Daily Stock Movement</h3>
+      <input type="date" id="summaryDate">
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th><th>Color</th><th>Size</th><th>IN</th><th>OUT</th><th>NET</th>
+          </tr>
+        </thead>
+        <tbody id="summaryBody"></tbody>
+      </table>
+      <br>
+      <button onclick="closeSummary()">Close</button>
+    </div>
+  </div>
+
+</div> <!-- end modalsContainer -->
+
+</div> <!-- end appUI -->
 
 <script>
-// 🔥 Firebase config (replace)
+// 🔥 Firebase config
 firebase.initializeApp({
   apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
   authDomain: "inventory-app-9f7a3.firebaseapp.com",
@@ -133,8 +143,6 @@ function login(){
 // AUTH + ROLE
 auth.onAuthStateChanged(async user=>{
   if(!user) return;
-
-  // hide login
   loginBox.classList.add("hidden");
   appUI.classList.remove("hidden");
 
@@ -157,14 +165,12 @@ function logout(){ auth.signOut(); }
 async function loadInventory(){
   const snap = await db.collection("inventory").get();
   ALL_DATA={};
-
   snap.forEach(d=>{
     const p=d.data();
     if(!ALL_DATA[p.code]) ALL_DATA[p.code]={code:p.code,name:p.name,variants:{},image:p.imageUrl||""};
     if(!ALL_DATA[p.code].variants[p.color]) ALL_DATA[p.code].variants[p.color]={};
     ALL_DATA[p.code].variants[p.color][p.size] = (ALL_DATA[p.code].variants[p.color][p.size]||0)+Number(p.stock);
   });
-
   render(ALL_DATA);
 }
 
