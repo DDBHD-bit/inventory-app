@@ -115,7 +115,7 @@ async function addProduct(){
   await ref.put(blob);
   const url=await ref.getDownloadURL();
 
-  await db.collection("products").add({
+  await db.collection("inventory").add({
     name:pname.value,
     code:pcode.value,
     color:pcolor.value,
@@ -132,7 +132,7 @@ async function addProduct(){
 async function loadProducts(){
   products.innerHTML="";
   const q=search.value.toLowerCase();
-  const snap=await db.collection("products").get();
+  const snap=await db.collection("inventory").get();
 
   snap.forEach(d=>{
     const p=d.data();
@@ -160,7 +160,7 @@ async function loadProducts(){
 }
 
 async function updateStock(id,d){
-  const ref=db.collection("products").doc(id);
+  const ref=db.collection("inventory").doc(id);
   const doc=await ref.get();
   ref.update({stock:doc.data().stock+d});
   loadProducts();
@@ -168,4 +168,5 @@ async function updateStock(id,d){
 </script>
 </body>
 </html>
+
 
