@@ -44,6 +44,24 @@ button.secondary{background:#64748b}
   width: 100%;
   max-width: 420px;
 }
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal .card {
+  width: 100%;
+  max-width: 420px;
+}
 
 </style>
 </head>
@@ -150,24 +168,24 @@ async function uploadToCloudinary(file){
 }
 
 // ➕ Add product
-async function addProduct(){
-  if(!pimage.files[0]) return alert("Image required");
-  const imageUrl=await uploadToCloudinary(pimage.files[0]);
+<!-- ADD PRODUCT MODAL -->
+<div class="modal hidden" id="addBox">
+  <div class="card">
+    <h3>Add Product</h3>
 
-  await db.collection("inventory").add({
-    name:pname.value,
-    code:pcode.value,
-    color:pcolor.value,
-    size:psize.value,
-    price:+pprice.value,
-    stock:+pstock.value,
-    image:imageUrl,
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  });
+    <input id="pname" placeholder="Name">
+    <input id="pcode" placeholder="Code">
+    <input id="pcolor" placeholder="Color">
+    <input id="psize" placeholder="Size">
+    <input id="pprice" type="number" placeholder="Price">
+    <input id="pstock" type="number" placeholder="Stock">
+    <input type="file" id="pimage" accept="image/*" capture="environment">
 
-  hideAdd();
-  loadProducts();
-}
+    <button onclick="addProduct()">Save</button>
+    <button class="secondary" onclick="hideAdd()">Cancel</button>
+  </div>
+</div>
+
 
 // 📦 Load products
 async function loadProducts(){
@@ -221,6 +239,7 @@ function hideAdd(){
 
 </body>
 </html>
+
 
 
 
