@@ -39,7 +39,7 @@ img.prodImg{width:80px;border-radius:6px;margin-bottom:6px}
 </div>
 
 <script>
-// 🔥 Firebase
+/* ==================== FIREBASE SETUP ==================== */
 firebase.initializeApp({
 
   apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
@@ -55,94 +55,111 @@ const CLOUDINARY_PRESET = "inventory_unsigned";
 
 let USER_ROLE="staff", ALL_DATA={}, html5QrCode;
 
-// LOGIN
+/* ==================== LOGIN ==================== */
 function login(){
   auth.signInWithEmailAndPassword(email.value,password.value).catch(e=>alert(e.message));
 }
 
-// AUTH STATE
+/* ==================== AUTH STATE ==================== */
 auth.onAuthStateChanged(async user=>{
   if(!user) return;
 
+  // Hide login box
   loginBox.style.display="none";
 
-  // Create app container dynamically
-  const appUI=document.createElement("div");
-  appUI.id="appUI";
+  // Create main app container
+  const appUI = document.createElement("div");
+  appUI.id = "appUI";
   document.body.appendChild(appUI);
 
-  // Fetch role
+  // Get role
   const doc = await db.collection("users").doc(user.uid).get();
   USER_ROLE = doc.exists?doc.data().role:"staff";
 
-  // Build app UI dynamically
+  // Build app UI
   buildAppUI();
   loadInventory();
 });
 
-// LOGOUT
+/* ==================== LOGOUT ==================== */
 function logout(){ auth.signOut(); }
 
-// === BUILD APP UI DYNAMICALLY ===
+/* ==================== BUILD APP UI ==================== */
 function buildAppUI(){
   const appUI = document.getElementById("appUI");
-  appUI.innerHTML=`
-    <header>
+
+  // Header + Buttons
+  let header = `<header>
       <h3>Inventory App</h3>
       <div>
-        <button id="scanBtn">Scan QR</button>
-        ${USER_ROLE==="admin"?'<button id="addBtn">Add Product</button><button id="dailyBtn">Daily Summary</button><button id="auditBtn">Audit Logs</button>':""}
-        <button onclick="logout()" class="red">Logout</button>
-      </div>
-    </header>
-    <input id="search" placeholder="Search code or name">
-    <div id="list"></div>
-    <div id="qrScanner" class="hidden"></div>
+        <button id="scanBtn">Scan QR</button>`;
+  if(USER_ROLE==="admin"){
+    header += `<button id="addBtn">Add Product</button>
+               <button id="dailyBtn">Daily Summary</button>
+               <button id="auditBtn">Audit Logs</button>`;
+  }
+  header += `<button onclick="logout()" class="red">Logout</button></div></header>`;
+  appUI.innerHTML = header;
 
-    <!-- Modals -->
-    <div id="addBox" class="modal hidden">
-      <div class="modalInner">
-        <h3>Add Product</h3>
-        <input id="pCode" placeholder="Code">
-        <input id="pName" placeholder="Name">
-        <input id="pColor" placeholder="Color">
-        <input id="pSize" placeholder="Size">
-        <input id="pStock" type="number" placeholder="Stock">
-        <input type="file" id="pImage" accept="image/*" capture="environment">
-        <button onclick="addProduct()">Save Product</button>
-        <button class="red" onclick="hideAdd()">Cancel</button>
-      </div>
-    </div>
+  // Search + Inventory list
+  appUI.innerHTML += `<input id="search" placeholder="Search code or name"><div id="list"></div><div id="qrScanner" class="hidden"></div>`;
 
-    <div id="auditBox" class="modal hidden">
-      <div class="modalInner">
-        <h3>Audit Logs</h3>
-        <table><thead><tr><th>Date</th><th>Code</th><th>Color</th><th>Size</th><th>Action</th><th>Qty</th><th>By</th></tr></thead><tbody id="auditBody"></tbody></table>
-        <button class="red" onclick="closeAudit()">Close</button>
-      </div>
-    </div>
+  // ==================== CREATE MODALS DYNAMICALLY ====================
+  if(USER_ROLE==="admin"){
+    // Add Product Modal
+    const addBox = document.createElement("div");
+    addBox.id = "addBox";
+    addBox.className = "modal hidden";
+    addBox.innerHTML = `<div class="modalInner">
+      <h3>Add Product</h3>
+      <input id="pCode" placeholder="Code">
+      <input id="pName" placeholder="Name">
+      <input id="pColor" placeholder="Color">
+      <input id="pSize" placeholder="Size">
+      <input id="pStock" type="number" placeholder="Stock">
+      <input type="file" id="pImage" accept="image/*" capture="environment">
+      <button onclick="addProduct()">Save Product</button>
+      <button class="red" onclick="hideAdd()">Cancel</button>
+    </div>`;
+    appUI.appendChild(addBox);
 
-    <div id="summaryBox" class="modal hidden">
-      <div class="modalInner">
-        <h3>Daily Stock Movement</h3>
-        <input type="date" id="summaryDate">
-        <table><thead><tr><th>Code</th><th>Color</th><th>Size</th><th>IN</th><th>OUT</th><th>NET</th></tr></thead><tbody id="summaryBody"></tbody></table>
-        <button onclick="closeSummary()">Close</button>
-      </div>
-    </div>
-  `;
+    // Daily Summary Modal
+    const summaryBox = document.createElement("div");
+    summaryBox.id = "summaryBox";
+    summaryBox.className = "modal hidden";
+    summaryBox.innerHTML = `<div class="modalInner">
+      <h3>Daily Stock Movement</h3>
+      <input type="date" id="summaryDate">
+      <table><thead><tr><th>Code</th><th>Color</th><th>Size</th><th>IN</th><th>OUT</th><th>NET</th></tr></thead>
+      <tbody id="summaryBody"></tbody></table>
+      <button onclick="closeSummary()">Close</button>
+    </div>`;
+    appUI.appendChild(summaryBox);
 
-  // Attach event listeners
+    // Audit Logs Modal
+    const auditBox = document.createElement("div");
+    auditBox.id = "auditBox";
+    auditBox.className = "modal hidden";
+    auditBox.innerHTML = `<div class="modalInner">
+      <h3>Audit Logs</h3>
+      <table><thead><tr><th>Date</th><th>Code</th><th>Color</th><th>Size</th><th>Action</th><th>Qty</th><th>By</th></tr></thead>
+      <tbody id="auditBody"></tbody></table>
+      <button class="red" onclick="closeAudit()">Close</button>
+    </div>`;
+    appUI.appendChild(auditBox);
+  }
+
+  // ==================== ATTACH EVENTS ====================
   if(USER_ROLE==="admin"){
     document.getElementById("addBtn").onclick=()=>document.getElementById("addBox").classList.remove("hidden");
-    document.getElementById("dailyBtn").onclick=()=>document.getElementById("summaryBox").classList.remove("hidden");
+    document.getElementById("dailyBtn").onclick=openDailySummary;
     document.getElementById("auditBtn").onclick=openAudit;
   }
   document.getElementById("search").oninput=filter;
   document.getElementById("scanBtn").onclick=startScan;
 }
 
-// === INVENTORY FUNCTIONS ===
+/* ==================== INVENTORY ==================== */
 async function loadInventory(){
   const snap = await db.collection("inventory").get();
   ALL_DATA={};
@@ -165,7 +182,8 @@ function render(data){
       Object.entries(sizes).forEach(([size,qty])=>{
         vhtml+=`<div class="sizeRow"><span>Size ${size}: <b>${qty}</b></span>`;
         if(USER_ROLE==="admin"){
-          vhtml+=`<span><button onclick="stockChange('${p.code}','${color}','${size}',1)">+</button><button onclick="stockChange('${p.code}','${color}','${size}',-1)">-</button></span>`;
+          vhtml+=`<span><button onclick="stockChange('${p.code}','${color}','${size}',1)">+</button>
+                    <button onclick="stockChange('${p.code}','${color}','${size}',-1)">-</button></span>`;
         }
         vhtml+="</div>";
       });
@@ -184,7 +202,7 @@ function filter(){
   render(f);
 }
 
-// STOCK IN/OUT
+/* ==================== STOCK IN/OUT ==================== */
 async function stockChange(code,color,size,delta){
   const q=await db.collection("inventory").where("code","==",code).where("color","==",color).where("size","==",size).limit(1).get();
   if(q.empty) return;
@@ -195,7 +213,7 @@ async function stockChange(code,color,size,delta){
   loadInventory();
 }
 
-// ADD PRODUCT
+/* ==================== ADD PRODUCT ==================== */
 async function uploadImage(file){if(!file) return ""; const fd=new FormData(); fd.append("file",file); fd.append("upload_preset",CLOUDINARY_PRESET); const r=await fetch(CLOUDINARY_URL,{method:"POST",body:fd}); return (await r.json()).secure_url;}
 async function addProduct(){
   if(USER_ROLE!=="admin"){alert("Admin only"); return;}
@@ -211,8 +229,9 @@ async function addProduct(){
   });
   alert("Product added"); document.getElementById("addBox").classList.add("hidden"); loadInventory();
 }
+function hideAdd(){document.getElementById("addBox").classList.add("hidden");}
 
-// AUDIT LOG
+/* ==================== AUDIT LOG ==================== */
 function openAudit(){document.getElementById("auditBox").classList.remove("hidden"); loadAudit();}
 function closeAudit(){document.getElementById("auditBox").classList.add("hidden");}
 async function loadAudit(){
@@ -227,7 +246,7 @@ async function loadAudit(){
   if(!tbody.innerHTML) tbody.innerHTML="<tr><td colspan='7'>No logs</td></tr>";
 }
 
-// DAILY SUMMARY
+/* ==================== DAILY SUMMARY ==================== */
 function openDailySummary(){const sb=document.getElementById("summaryBox"); sb.classList.remove("hidden"); document.getElementById("summaryDate").value=new Date().toISOString().split("T")[0]; loadSummary(document.getElementById("summaryDate").value);}
 function closeSummary(){document.getElementById("summaryBox").classList.add("hidden");}
 document.getElementById("appUI")?.addEventListener("change",e=>{if(e.target.id==="summaryDate") loadSummary(e.target.value);});
@@ -247,7 +266,7 @@ async function loadSummary(dateStr){
   if(!tbody.innerHTML) tbody.innerHTML="<tr><td colspan='6'>No activity</td></tr>";
 }
 
-// QR SCAN
+/* ==================== QR SCAN ==================== */
 function startScan(){
   const scanner=document.getElementById("qrScanner");
   scanner.classList.remove("hidden");
@@ -260,5 +279,6 @@ function startScan(){
 function stopScan(){if(html5QrCode) html5QrCode.stop(); document.getElementById("qrScanner").classList.add("hidden");}
 function filterQR(msg){const q=msg.toLowerCase(); const f={}; Object.values(ALL_DATA).forEach(p=>{if(p.code.toLowerCase()===q) f[p.code]=p}); render(f);}
 </script>
+
 </body>
 </html>
