@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Inventory App</title>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -39,74 +40,11 @@ img.prodImg{width:80px;border-radius:6px;margin-bottom:6px}
   <button onclick="login()">Login</button>
 </div>
 
-<!-- MAIN APP -->
-<div id="appUI" class="hidden">
-
-<header>
-  <h3>Inventory</h3>
-  <div>
-    <button id="scanBtn" onclick="startScan()">Scan QR</button>
-    <button id="dailyBtn" class="hidden" onclick="openDailySummary()">Daily Summary</button>
-    <button id="auditBtn" class="hidden" onclick="openAudit()">Audit Logs</button>
-    <button id="addBtn" class="hidden" onclick="showAdd()">Add Product</button>
-    <button onclick="logout()" class="red">Logout</button>
-  </div>
-</header>
-
-<input id="search" placeholder="Search code or name" oninput="filter()">
-<div id="list"></div>
-<div id="qrScanner" class="hidden"></div>
-
-<!-- ADD PRODUCT MODAL -->
-<div id="addBox" class="modal hidden">
-  <div class="modalInner">
-    <h3>Add Product</h3>
-    <input id="pCode" placeholder="Code">
-    <input id="pName" placeholder="Name">
-    <input id="pColor" placeholder="Color">
-    <input id="pSize" placeholder="Size">
-    <input id="pStock" type="number" placeholder="Stock">
-    <input type="file" id="pImage" accept="image/*" capture="environment">
-    <button onclick="addProduct()">Save Product</button>
-    <button class="red" onclick="hideAdd()">Cancel</button>
-  </div>
-</div>
-
-<!-- AUDIT LOG MODAL -->
-<div id="auditBox" class="modal hidden">
-  <div class="modalInner">
-    <h3>Audit Logs</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Date</th><th>Code</th><th>Color</th><th>Size</th><th>Action</th><th>Qty</th><th>By</th>
-        </tr>
-      </thead>
-      <tbody id="auditBody"></tbody>
-    </table>
-    <button class="red" onclick="closeAudit()">Close</button>
-  </div>
-</div>
-
-<!-- DAILY SUMMARY MODAL -->
-<div id="summaryBox" class="modal hidden">
-  <div class="modalInner">
-    <h3>Daily Stock Movement</h3>
-    <input type="date" id="summaryDate">
-    <table>
-      <thead>
-        <tr>
-          <th>Code</th><th>Color</th><th>Size</th><th>IN</th><th>OUT</th><th>NET</th>
-        </tr>
-      </thead>
-      <tbody id="summaryBody"></tbody>
-    </table>
-    <button onclick="closeSummary()">Close</button>
-  </div>
-</div>
+<!-- APP CONTAINER -->
+<div id="appUI" class="hidden"></div>
 
 <script>
-// 🔥 Firebase config
+// Firebase config
 firebase.initializeApp({
 
   apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
@@ -122,7 +60,7 @@ const CLOUDINARY_PRESET = "inventory_unsigned";
 
 let USER_ROLE="staff", ALL_DATA={}, html5QrCode;
 
-// LOGIN
+// LOGIN FUNCTION
 function login(){
   auth.signInWithEmailAndPassword(email.value,password.value).catch(e=>alert(e.message));
 }
@@ -130,23 +68,84 @@ function login(){
 // AUTH STATE
 auth.onAuthStateChanged(async user=>{
   if(!user) return;
+
   loginBox.classList.add("hidden");
+  const appUI = document.getElementById("appUI");
   appUI.classList.remove("hidden");
+
+  // Fetch role
   const doc = await db.collection("users").doc(user.uid).get();
   USER_ROLE = doc.exists?doc.data().role:"staff";
-  if(USER_ROLE==="admin"){
-    addBtn.classList.remove("hidden");
-    dailyBtn.classList.remove("hidden");
-    auditBtn.classList.remove("hidden");
-  }
+
+  // Build UI dynamically
+  buildAppUI();
   loadInventory();
 });
 
 function logout(){ auth.signOut(); }
 
-// LOAD INVENTORY
+// Build full app UI dynamically
+function buildAppUI(){
+  const appUI = document.getElementById("appUI");
+  appUI.innerHTML=`
+    <header>
+      <h3>Inventory</h3>
+      <div>
+        <button id="scanBtn">Scan QR</button>
+        ${USER_ROLE==="admin"?'<button id="addBtn">Add Product</button><button id="dailyBtn">Daily Summary</button><button id="auditBtn">Audit Logs</button>':""}
+        <button onclick="logout()" class="red">Logout</button>
+      </div>
+    </header>
+    <input id="search" placeholder="Search code or name">
+    <div id="list"></div>
+    <div id="qrScanner" class="hidden"></div>
+
+    <!-- Modals -->
+    <div id="addBox" class="modal hidden">
+      <div class="modalInner">
+        <h3>Add Product</h3>
+        <input id="pCode" placeholder="Code">
+        <input id="pName" placeholder="Name">
+        <input id="pColor" placeholder="Color">
+        <input id="pSize" placeholder="Size">
+        <input id="pStock" type="number" placeholder="Stock">
+        <input type="file" id="pImage" accept="image/*" capture="environment">
+        <button onclick="addProduct()">Save Product</button>
+        <button class="red" onclick="hideAdd()">Cancel</button>
+      </div>
+    </div>
+
+    <div id="auditBox" class="modal hidden">
+      <div class="modalInner">
+        <h3>Audit Logs</h3>
+        <table><thead><tr><th>Date</th><th>Code</th><th>Color</th><th>Size</th><th>Action</th><th>Qty</th><th>By</th></tr></thead><tbody id="auditBody"></tbody></table>
+        <button class="red" onclick="closeAudit()">Close</button>
+      </div>
+    </div>
+
+    <div id="summaryBox" class="modal hidden">
+      <div class="modalInner">
+        <h3>Daily Stock Movement</h3>
+        <input type="date" id="summaryDate">
+        <table><thead><tr><th>Code</th><th>Color</th><th>Size</th><th>IN</th><th>OUT</th><th>NET</th></tr></thead><tbody id="summaryBody"></tbody></table>
+        <button onclick="closeSummary()">Close</button>
+      </div>
+    </div>
+  `;
+
+  // Attach event listeners
+  if(USER_ROLE==="admin"){
+    document.getElementById("addBtn").onclick=showAdd;
+    document.getElementById("dailyBtn").onclick=openDailySummary;
+    document.getElementById("auditBtn").onclick=openAudit;
+  }
+  document.getElementById("search").oninput=filter;
+  document.getElementById("scanBtn").onclick=startScan;
+}
+
+// === INVENTORY ===
 async function loadInventory(){
-  const snap=await db.collection("inventory").get();
+  const snap = await db.collection("inventory").get();
   ALL_DATA={};
   snap.forEach(d=>{
     const p=d.data();
@@ -157,8 +156,8 @@ async function loadInventory(){
   render(ALL_DATA);
 }
 
-// RENDER
 function render(data){
+  const list = document.getElementById("list");
   list.innerHTML="";
   Object.values(data).forEach(p=>{
     let vhtml="";
@@ -177,9 +176,8 @@ function render(data){
   });
 }
 
-// SEARCH
 function filter(){
-  const q=search.value.toLowerCase();
+  const q=document.getElementById("search").value.toLowerCase();
   const f={};
   Object.values(ALL_DATA).forEach(p=>{
     if(p.code.toLowerCase().includes(q)||p.name.toLowerCase().includes(q)) f[p.code]=p;
@@ -202,34 +200,68 @@ async function stockChange(code,color,size,delta){
 async function uploadImage(file){if(!file) return ""; const fd=new FormData(); fd.append("file",file); fd.append("upload_preset",CLOUDINARY_PRESET); const r=await fetch(CLOUDINARY_URL,{method:"POST",body:fd}); return (await r.json()).secure_url;}
 async function addProduct(){
   if(USER_ROLE!=="admin"){alert("Admin only"); return;}
-  const imgUrl=await uploadImage(pImage.files[0]);
-  await db.collection("inventory").add({code:pCode.value.trim(),name:pName.value.trim(),color:pColor.value.trim(),size:pSize.value.trim(),stock:Number(pStock.value),imageUrl:imgUrl,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+  const imgUrl=await uploadImage(document.getElementById("pImage").files[0]);
+  await db.collection("inventory").add({
+    code:document.getElementById("pCode").value.trim(),
+    name:document.getElementById("pName").value.trim(),
+    color:document.getElementById("pColor").value.trim(),
+    size:document.getElementById("pSize").value.trim(),
+    stock:Number(document.getElementById("pStock").value),
+    imageUrl:imgUrl,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  });
   alert("Product added"); hideAdd(); loadInventory();
 }
-function showAdd(){addBox.classList.remove("hidden");}
-function hideAdd(){addBox.classList.add("hidden");}
+
+function showAdd(){document.getElementById("addBox").classList.remove("hidden");}
+function hideAdd(){document.getElementById("addBox").classList.add("hidden");}
 
 // AUDIT LOG
-function openAudit(){auditBox.classList.remove("hidden");loadAudit();}
-function closeAudit(){auditBox.classList.add("hidden");}
-async function loadAudit(){const tbody=auditBody; const snap=await db.collection("audit_logs").orderBy("time","desc").limit(100).get(); tbody.innerHTML=""; snap.forEach(d=>{const a=d.data(); const t=a.time?a.time.toDate().toLocaleString():""; tbody.innerHTML+=`<tr><td>${t}</td><td>${a.code}</td><td>${a.color}</td><td>${a.size}</td><td>${a.action}</td><td>${a.qty}</td><td>${a.by}</td></tr>`}); if(!tbody.innerHTML) tbody.innerHTML="<tr><td colspan='7'>No logs</td></tr>";}
+function openAudit(){document.getElementById("auditBox").classList.remove("hidden"); loadAudit();}
+function closeAudit(){document.getElementById("auditBox").classList.add("hidden");}
+async function loadAudit(){
+  const tbody=document.getElementById("auditBody");
+  const snap=await db.collection("audit_logs").orderBy("time","desc").limit(100).get();
+  tbody.innerHTML="";
+  snap.forEach(d=>{
+    const a=d.data();
+    const t=a.time?a.time.toDate().toLocaleString():"";
+    tbody.innerHTML+=`<tr><td>${t}</td><td>${a.code}</td><td>${a.color}</td><td>${a.size}</td><td>${a.action}</td><td>${a.qty}</td><td>${a.by}</td></tr>`;
+  });
+  if(!tbody.innerHTML) tbody.innerHTML="<tr><td colspan='7'>No logs</td></tr>";
+}
 
 // DAILY SUMMARY
-function openDailySummary(){summaryBox.classList.remove("hidden"); summaryDate.value=new Date().toISOString().split("T")[0]; loadSummary(summaryDate.value);}
-function closeSummary(){summaryBox.classList.add("hidden");}
-summaryDate.onchange=()=>loadSummary(summaryDate.value);
-async function loadSummary(dateStr){const tbody=summaryBody; tbody.innerHTML="<tr><td colspan='6'>Loading...</td></tr>"; const s=new Date(dateStr); s.setHours(0,0,0,0); const e=new Date(dateStr); e.setHours(23,59,59,999); const snap=await db.collection("audit_logs").where("time",">=",s).where("time","<=",e).get(); const map={}; snap.forEach(d=>{const a=d.data(); const k=`${a.code}_${a.color}_${a.size}`; if(!map[k]) map[k]={code:a.code,color:a.color,size:a.size,in:0,out:0}; a.action==="IN"?map[k].in+=a.qty:map[k].out+=a.qty;}); tbody.innerHTML=""; Object.values(map).forEach(r=>{const net=r.in-r.out; tbody.innerHTML+=`<tr><td>${r.code}</td><td>${r.color}</td><td>${r.size}</td><td style="color:green">${r.in}</td><td style="color:red">${r.out}</td><td><b>${net>0?"+":""}${net}</b></td></tr>`}); if(!tbody.innerHTML) tbody.innerHTML="<tr><td colspan='6'>No activity</td></tr>";}
+function openDailySummary(){const sb=document.getElementById("summaryBox"); sb.classList.remove("hidden"); document.getElementById("summaryDate").value=new Date().toISOString().split("T")[0]; loadSummary(document.getElementById("summaryDate").value);}
+function closeSummary(){document.getElementById("summaryBox").classList.add("hidden");}
+document.getElementById("appUI").addEventListener("change",e=>{if(e.target.id==="summaryDate") loadSummary(e.target.value);});
+async function loadSummary(dateStr){
+  const tbody=document.getElementById("summaryBody"); tbody.innerHTML="<tr><td colspan='6'>Loading...</td></tr>";
+  const s=new Date(dateStr); s.setHours(0,0,0,0);
+  const e=new Date(dateStr); e.setHours(23,59,59,999);
+  const snap=await db.collection("audit_logs").where("time",">=",s).where("time","<=",e).get();
+  const map={};
+  snap.forEach(d=>{
+    const a=d.data(); const k=`${a.code}_${a.color}_${a.size}`;
+    if(!map[k]) map[k]={code:a.code,color:a.color,size:a.size,in:0,out:0};
+    a.action==="IN"?map[k].in+=a.qty:map[k].out+=a.qty;
+  });
+  tbody.innerHTML="";
+  Object.values(map).forEach(r=>{const net=r.in-r.out; tbody.innerHTML+=`<tr><td>${r.code}</td><td>${r.color}</td><td>${r.size}</td><td style="color:green">${r.in}</td><td style="color:red">${r.out}</td><td><b>${net>0?"+":""}${net}</b></td></tr>`});
+  if(!tbody.innerHTML) tbody.innerHTML="<tr><td colspan='6'>No activity</td></tr>";
+}
 
 // QR SCAN
 function startScan(){
-  qrScanner.classList.remove("hidden");
+  const scanner=document.getElementById("qrScanner");
+  scanner.classList.remove("hidden");
   html5QrCode=new Html5Qrcode("qrScanner");
   html5QrCode.start({facingMode:"environment"},{fps:10,qrbox:250}, qrCodeMessage=>{
     navigator.vibrate?.(200); new Audio('https://www.soundjay.com/buttons/sounds/beep-07.mp3').play();
     filterQR(qrCodeMessage); stopScan();
   }, errorMessage=>{});
 }
-function stopScan(){if(html5QrCode) html5QrCode.stop(); qrScanner.classList.add("hidden");}
+function stopScan(){if(html5QrCode) html5QrCode.stop(); document.getElementById("qrScanner").classList.add("hidden");}
 function filterQR(msg){const q=msg.toLowerCase(); const f={}; Object.values(ALL_DATA).forEach(p=>{if(p.code.toLowerCase()===q) f[p.code]=p}); render(f);}
 </script>
 </body>
