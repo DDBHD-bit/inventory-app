@@ -3,168 +3,319 @@
 <head>
 <meta charset="UTF-8">
 <title>Inventory App</title>
-
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-body { font-family: Arial; background:#f2f2f2; margin:0; padding:20px; }
-button { padding:6px 12px; border:none; border-radius:6px; background:#007bff; color:white; cursor:pointer; }
-button.red { background:#dc3545; }
-input { padding:6px; width:100%; margin-bottom:8px; }
+body { font-family: Arial, sans-serif; margin:0; background:#f3f4f6; }
+.hidden { display:none !important; }
 
-#loginBox {
-  max-width:320px;
-  margin:120px auto;
-  background:white;
-  padding:20px;
-  border-radius:10px;
-  box-shadow:0 4px 8px rgba(0,0,0,.2);
+header {
+  background:#111827; color:white; padding:12px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+
+button {
+  padding:6px 10px;
+  border:none; border-radius:6px;
+  background:#2563eb; color:white;
+  cursor:pointer; font-size:14px;
+}
+
+button.secondary { background:#6b7280; }
+button.danger { background:#dc2626; }
+
+input {
+  width:100%; padding:8px;
+  margin-bottom:8px;
+  border-radius:6px; border:1px solid #ccc;
 }
 
 .card {
   background:white;
+  border-radius:12px;
   padding:12px;
-  margin-top:12px;
-  border-radius:10px;
+  margin-bottom:12px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.05);
 }
+
+.product-header {
+  display:flex; gap:10px; align-items:center;
+}
+
+.product-img {
+  width:60px; height:60px;
+  border-radius:8px;
+  object-fit:cover;
+  background:#e5e7eb;
+}
+
+.badge {
+  padding:2px 8px;
+  border-radius:12px;
+  font-size:12px;
+  background:#e5e7eb;
+}
+
+.low { background:#fee2e2; color:#991b1b; }
 
 .modal {
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.6);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  z-index:9999;
+  position:fixed; inset:0;
+  background:rgba(0,0,0,0.5);
+  display:flex; align-items:center; justify-content:center;
+  z-index:1000;
 }
 
-.modalInner {
+.modal-content {
   background:white;
-  padding:16px;
-  width:320px;
-  border-radius:10px;
+  padding:20px;
+  width:90%;
+  max-width:480px;
+  border-radius:12px;
 }
-
-.hidden { display:none; }
 </style>
 </head>
+
 <body>
 
-<!-- LOGIN ONLY -->
-<div id="loginBox">
-  <h3>Login</h3>
-  <input id="email" placeholder="Email">
-  <input id="password" type="password" placeholder="Password">
-  <button onclick="login()">Login</button>
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="card">
+    <h3>Login</h3>
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+  </div>
 </div>
 
-<script>
-/* ================= FIREBASE ================= */
-firebase.initializeApp({
-  apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
-  authDomain: "inventory-app-9f7a3.firebaseapp.com",
-  projectId: "inventory-app-9f7a3"
-});
+<!-- APP -->
+<div id="appScreen" class="hidden">
 
-const auth = firebase.auth();
-const db = firebase.firestore();
+<header>
+  <div>Inventory</div>
+  <div>
+    <button onclick="openScan()">Scan QR</button>
+    <button onclick="openAdd()">Add</button>
+    <button class="secondary" onclick="openSummary()">Summary</button>
+    <button class="secondary" onclick="openAudit()">Audit</button>
+    <button class="danger" onclick="logout()">Logout</button>
+  </div>
+</header>
 
-let openModal = null;
+<div style="padding:10px">
+  <input id="search" placeholder="Search code / name" oninput="render()">
+  <div id="list"></div>
+</div>
 
-/* ================= LOGIN ================= */
-function login(){
-  auth.signInWithEmailAndPassword(email.value, password.value)
-    .catch(e => alert(e.message));
-}
+</div>
 
-/* ================= ESC KEY CLOSE ================= */
-document.addEventListener("keydown", e => {
-  if (e.key === "Escape" && openModal) {
-    openModal.classList.add("hidden");
-    openModal = null;
-  }
-});
+<!-- ADD PRODUCT -->
+<div id="addModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Add / Update Product</h3>
+    <input id="pCode" placeholder="Code">
+    <input id="pName" placeholder="Name">
+    <input id="pColor" placeholder="Color">
+    <input id="pSize" placeholder="Size">
+    <input id="pQty" type="number" placeholder="Quantity">
+    <input type="file" id="pImage" accept="image/*" capture="environment">
+    <button onclick="saveProduct()">Save</button>
+    <button class="secondary" onclick="closeModals()">Close</button>
+  </div>
+</div>
 
-/* ================= POST LOGIN ================= */
-auth.onAuthStateChanged(user => {
-  if (!user) return;
+<!-- QR -->
+<div id="scanModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Scan QR</h3>
+    <div id="qr-reader"></div>
+    <button class="secondary" onclick="closeModals()">Close</button>
+  </div>
+</div>
 
-  document.getElementById("loginBox").remove();
+<!-- SUMMARY -->
+<div id="summaryModal" class="modal hidden">
+  <div class="modal-content">
+    <h3>Daily Stock Movement</h3>
+    <div id="summary"></div>
+    <button class="secondary" onclick="closeModals()">Close</button>
+  </div>
+</div>
 
-  const appUI = document.createElement("div");
-  document.body.appendChild(appUI);
-
-  /* ===== HEADER ===== */
-  appUI.innerHTML = `
-    <h2>Inventory App</h2>
-    <button id="addBtn">Add Product</button>
-    <button id="auditBtn">Audit Logs</button>
-    <button id="summaryBtn">Daily Summary</button>
-    <button id="logoutBtn" class="red">Logout</button>
-    <div id="results" class="card">Products will show here</div>
-  `;
-
-  /* ===== ADD PRODUCT MODAL ===== */
-  const addModal = createModal(`
-    <h3>Add Product</h3>
-    <input placeholder="Code">
-    <input placeholder="Name">
-    <button id="closeAdd">Close</button>
-  `);
-
-  /* ===== AUDIT MODAL ===== */
-  const auditModal = createModal(`
+<!-- AUDIT -->
+<div id="auditModal" class="modal hidden">
+  <div class="modal-content">
     <h3>Audit Logs</h3>
-    <p>No logs yet</p>
-    <button id="closeAudit">Close</button>
-  `);
+    <div id="audit"></div>
+    <button class="secondary" onclick="closeModals()">Close</button>
+  </div>
+</div>
 
-  /* ===== SUMMARY MODAL ===== */
-  const summaryModal = createModal(`
-    <h3>Daily Summary</h3>
-    <p>No data</p>
-    <button id="closeSummary">Close</button>
-  `);
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
 
-  /* ===== BUTTON EVENTS ===== */
-  document.getElementById("addBtn").onclick = () => open(addModal);
-  document.getElementById("auditBtn").onclick = () => open(auditModal);
-  document.getElementById("summaryBtn").onclick = () => open(summaryModal);
-  document.getElementById("logoutBtn").onclick = () => auth.signOut();
+<script>
+firebase.initializeApp(  apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
+  authDomain: "inventory-app-9f7a3.firebaseapp.com",
+  projectId: "inventory-app-9f7a3");
+const auth=firebase.auth();
+const db=firebase.firestore();
 
-  document.getElementById("closeAdd").onclick = () => close(addModal);
-  document.getElementById("closeAudit").onclick = () => close(auditModal);
-  document.getElementById("closeSummary").onclick = () => close(summaryModal);
+const CLOUDINARY_NAME="dahxnopuw";
+const CLOUDINARY_PRESET="inventory_unsigned";
+
+let inventory=[], role="staff", scanner=null;
+
+auth.onAuthStateChanged(async user=>{
+  if(!user){
+    loginScreen.classList.remove("hidden");
+    appScreen.classList.add("hidden");
+    return;
+  }
+  const u=await db.collection("users").doc(user.uid).get();
+  role=u.exists?u.data().role:"staff";
+  loginScreen.classList.add("hidden");
+  appScreen.classList.remove("hidden");
+  loadInventory();
 });
 
-/* ================= MODAL HELPERS ================= */
-function createModal(innerHTML){
-  const m = document.createElement("div");
-  m.className = "modal hidden";
-  m.innerHTML = `<div class="modalInner">${innerHTML}</div>`;
-  document.body.appendChild(m);
+function login(){
+  auth.signInWithEmailAndPassword(email.value,password.value)
+  .catch(e=>alert(e.message));
+}
+function logout(){ auth.signOut(); }
 
-  // click outside closes
-  m.onclick = e => {
-    if (e.target === m) close(m);
-  };
-
-  return m;
+async function loadInventory(){
+  const s=await db.collection("inventory").get();
+  inventory=s.docs.map(d=>({id:d.id,...d.data()}));
+  render();
 }
 
-function open(modal){
-  modal.classList.remove("hidden");
-  openModal = modal;
+function render(){
+  list.innerHTML="";
+  const q=search.value.toLowerCase();
+  const grouped={};
+
+  inventory.forEach(i=>{
+    if(!i.code.toLowerCase().includes(q)&&!i.name.toLowerCase().includes(q)) return;
+    grouped[i.code]??={};
+    grouped[i.code][i.color]??=[];
+    grouped[i.code][i.color].push(i);
+  });
+
+  Object.keys(grouped).forEach(code=>{
+    const first=grouped[code][Object.keys(grouped[code])[0]][0];
+    const card=document.createElement("div");
+    card.className="card";
+    card.innerHTML=`
+      <div class="product-header">
+        <img class="product-img" src="${first.image||''}">
+        <div><b>${code}</b><br>${first.name}</div>
+      </div>
+    `;
+    Object.keys(grouped[code]).forEach(color=>{
+      card.innerHTML+=`<div><b>${color}</b></div>`;
+      grouped[code][color].forEach(i=>{
+        card.innerHTML+=`
+        <div style="margin-left:15px">
+          ${i.size} |
+          <span class="badge ${i.qty<5?'low':''}">Qty: ${i.qty}</span>
+          <button onclick="stock('${i.id}',1)">+</button>
+          <button onclick="stock('${i.id}',-1)">−</button>
+          ${role==="admin"?`<button class="danger" onclick="del('${i.id}')">Delete</button>`:""}
+        </div>`;
+      });
+    });
+    list.appendChild(card);
+  });
 }
 
-function close(modal){
-  modal.classList.add("hidden");
-  if (openModal === modal) openModal = null;
+function openAdd(){ closeModals(); addModal.classList.remove("hidden"); }
+function openScan(){
+  closeModals(); scanModal.classList.remove("hidden");
+  scanner=new Html5Qrcode("qr-reader");
+  scanner.start({facingMode:"environment"},{fps:10,qrbox:250},txt=>{
+    scanner.stop(); closeModals();
+    search.value=txt; render();
+    navigator.vibrate?.(200);
+  });
+}
+function openSummary(){ closeModals(); summaryModal.classList.remove("hidden"); }
+function openAudit(){ closeModals(); loadAudit(); auditModal.classList.remove("hidden"); }
+
+function closeModals(){
+  document.querySelectorAll(".modal").forEach(m=>m.classList.add("hidden"));
+}
+
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModals(); });
+
+async function compress(f){
+  return new Promise(r=>{
+    const i=new Image();
+    i.onload=()=>{
+      const c=document.createElement("canvas");
+      const s=Math.min(1,800/i.width);
+      c.width=i.width*s; c.height=i.height*s;
+      c.getContext("2d").drawImage(i,0,0,c.width,c.height);
+      c.toBlob(b=>r(b),"image/jpeg",0.7);
+    };
+    i.src=URL.createObjectURL(f);
+  });
+}
+
+async function upload(file){
+  const fd=new FormData();
+  fd.append("file",file);
+  fd.append("upload_preset",CLOUDINARY_PRESET);
+  const r=await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_NAME}/image/upload`,{method:"POST",body:fd});
+  return (await r.json()).secure_url;
+}
+
+async function saveProduct(){
+  let img="";
+  if(pImage.files[0]) img=await upload(await compress(pImage.files[0]));
+
+  const q=await db.collection("inventory")
+    .where("code","==",pCode.value)
+    .where("color","==",pColor.value)
+    .where("size","==",pSize.value).get();
+
+  if(q.empty){
+    await db.collection("inventory").add({
+      code:pCode.value,name:pName.value,color:pColor.value,
+      size:pSize.value,qty:+pQty.value,image:img
+    });
+  } else {
+    const d=q.docs[0];
+    await d.ref.update({qty:d.data().qty+(+pQty.value),image:img||d.data().image});
+  }
+
+  await db.collection("audit_logs").add({type:"ADD",code:pCode.value,at:new Date()});
+  closeModals(); loadInventory();
+}
+
+async function stock(id,d){
+  const r=db.collection("inventory").doc(id);
+  const s=await r.get();
+  await r.update({qty:s.data().qty+d});
+  await db.collection("audit_logs").add({type:d>0?"IN":"OUT",code:s.data().code,at:new Date()});
+  loadInventory();
+}
+
+async function del(id){
+  if(!confirm("Delete permanently?")) return;
+  const d=await db.collection("inventory").doc(id).get();
+  await d.ref.delete();
+  await db.collection("audit_logs").add({type:"DELETE",code:d.data().code,at:new Date()});
+  loadInventory();
+}
+
+async function loadAudit(){
+  const s=await db.collection("audit_logs").orderBy("at","desc").limit(20).get();
+  audit.innerHTML=s.docs.map(d=>JSON.stringify(d.data())).join("<hr>");
 }
 </script>
 
 </body>
 </html>
-
