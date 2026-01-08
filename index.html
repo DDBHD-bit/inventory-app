@@ -237,21 +237,44 @@ window.closeLogin = ()=>loginModal.style.display="none";
 window.login = async()=>{
   try{
     const cred = await signInWithEmailAndPassword(
-      auth,email.value,password.value
+      auth,
+      email.value.trim(),
+      password.value.trim()
     );
-    const snap = await getDoc(doc(db,"users",cred.user.uid));
-    if(!snap.exists()||!snap.data().active){
-      alert("Access denied"); return;
+
+    console.log("AUTH OK", cred.user.uid);
+
+    const ref = doc(db,"users",cred.user.uid);
+    const snap = await getDoc(ref);
+
+    console.log("USER DOC EXISTS:", snap.exists());
+
+    if(!snap.exists()){
+      alert("User profile missing in Firestore");
+      return;
     }
-    localStorage.setItem("role",snap.data().role);
-    localStorage.setItem("staff",snap.data().name);
+
+    const data = snap.data();
+    console.log("USER DATA:", data);
+
+    if(!data.active){
+      alert("User disabled");
+      return;
+    }
+
+    localStorage.setItem("role",data.role);
+    localStorage.setItem("staff",data.name);
+
     publicView.style.display="none";
     staffView.style.display="block";
     loginModal.style.display="none";
-  }catch{
-    alert("Invalid login");
+
+  }catch(err){
+    console.error(err);
+    alert(err.message);
   }
 };
+
 
 /* LOGOUT */
 window.logout = async()=>{
@@ -271,3 +294,4 @@ onAuthStateChanged(auth,user=>{
 </script>
 </body>
 </html>
+
