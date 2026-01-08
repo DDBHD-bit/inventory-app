@@ -26,6 +26,25 @@ button.secondary{background:#64748b}
 .product img{width:80px;height:80px;border-radius:10px;object-fit:cover}
 .actions button{width:auto;margin-right:6px}
 .low{color:red;font-weight:bold}
+/* Modal overlay */
+.modal {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* Modal content */
+.modal .card {
+  width: 100%;
+  max-width: 420px;
+}
+
 </style>
 </head>
 
@@ -54,7 +73,7 @@ button.secondary{background:#64748b}
 </div>
 
 <!-- ADD PRODUCT -->
-<div class="container hidden" id="addBox">
+<div class="modal hidden" id="addBox">
   <div class="card">
     <h3>Add Product</h3>
     <input id="pname" placeholder="Name">
@@ -188,11 +207,20 @@ async function updateStock(id,delta){
   loadProducts();
 }
 
-function showAdd(){ addBox.classList.remove("hidden"); }
-function hideAdd(){ addBox.classList.add("hidden"); }
+function showAdd(){
+  addBox.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+}
+
+function hideAdd(){
+  addBox.classList.add("hidden");
+  document.body.style.overflow = "auto";
+}
+
 </script>
 
 </body>
 </html>
+
 
 
