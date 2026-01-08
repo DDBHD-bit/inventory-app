@@ -9,6 +9,9 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
+<!-- QR Code scanner library -->
+<script src="https://unpkg.com/html5-qrcode"></script>
+
 <style>
 body { font-family: Arial; background:#f2f2f2; margin:0; padding:12px }
 button { padding:6px 10px; border:none; background:#007bff; color:white; border-radius:6px; cursor:pointer }
@@ -26,8 +29,11 @@ th { background:#eee }
 input { width:100%; padding:6px; margin-bottom:6px }
 img.prodImg { width:80px; border-radius:6px; margin-bottom:6px }
 
+/* LOGIN BOX */
 #loginBox { z-index:9999; position:relative; background:#fff; padding:20px; border-radius:8px; max-width:300px; margin:100px auto; box-shadow:0 4px 8px rgba(0,0,0,.2) }
+/* MAIN APP */
 #appUI { display:flex; flex-direction:column; }
+#qrScanner { width:100%; max-width:320px; margin-top:10px; }
 </style>
 </head>
 
@@ -47,6 +53,7 @@ img.prodImg { width:80px; border-radius:6px; margin-bottom:6px }
 <header>
   <h3>Inventory</h3>
   <div>
+    <button id="scanBtn" onclick="startScan()">Scan QR</button>
     <button id="dailyBtn" class="hidden" onclick="openDailySummary()">Daily Summary</button>
     <button onclick="openAudit()" class="hidden" id="auditBtn">Audit Logs</button>
     <button id="addBtn" class="hidden" onclick="showAdd()">Add Product</button>
@@ -57,63 +64,57 @@ img.prodImg { width:80px; border-radius:6px; margin-bottom:6px }
 <input id="search" placeholder="Search code or name" oninput="filter()">
 
 <div id="list"></div>
+<div id="qrScanner" class="hidden"></div>
 
-<!-- MODALS CONTAINER -->
-<div id="modalsContainer">
-
-  <!-- ADD PRODUCT MODAL -->
-  <div id="addBox" class="modal hidden">
-    <div class="modalInner">
-      <h3>Add Product</h3>
-      <input id="pCode" placeholder="Code">
-      <input id="pName" placeholder="Name">
-      <input id="pColor" placeholder="Color">
-      <input id="pSize" placeholder="Size">
-      <input id="pStock" type="number" placeholder="Stock">
-      <input type="file" id="pImage" accept="image/*" capture="environment">
-      <button onclick="addProduct()">Save Product</button>
-      <button class="red" onclick="hideAdd()">Cancel</button>
-    </div>
+<!-- ADD PRODUCT MODAL -->
+<div id="addBox" class="modal hidden">
+  <div class="modalInner">
+    <h3>Add Product</h3>
+    <input id="pCode" placeholder="Code">
+    <input id="pName" placeholder="Name">
+    <input id="pColor" placeholder="Color">
+    <input id="pSize" placeholder="Size">
+    <input id="pStock" type="number" placeholder="Stock">
+    <input type="file" id="pImage" accept="image/*" capture="environment">
+    <button onclick="addProduct()">Save Product</button>
+    <button class="red" onclick="hideAdd()">Cancel</button>
   </div>
+</div>
 
-  <!-- AUDIT LOG MODAL -->
-  <div id="auditBox" class="modal hidden">
-    <div class="modalInner">
-      <h3>Audit Logs</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th><th>Code</th><th>Color</th><th>Size</th><th>Action</th><th>Qty</th><th>By</th>
-          </tr>
-        </thead>
-        <tbody id="auditBody"></tbody>
-      </table>
-      <br>
-      <button class="red" onclick="closeAudit()">Close</button>
-    </div>
+<!-- AUDIT LOG MODAL -->
+<div id="auditBox" class="modal hidden">
+  <div class="modalInner">
+    <h3>Audit Logs</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th><th>Code</th><th>Color</th><th>Size</th><th>Action</th><th>Qty</th><th>By</th>
+        </tr>
+      </thead>
+      <tbody id="auditBody"></tbody>
+    </table>
+    <br>
+    <button class="red" onclick="closeAudit()">Close</button>
   </div>
+</div>
 
-  <!-- DAILY SUMMARY MODAL -->
-  <div id="summaryBox" class="modal hidden">
-    <div class="modalInner">
-      <h3>Daily Stock Movement</h3>
-      <input type="date" id="summaryDate">
-      <table>
-        <thead>
-          <tr>
-            <th>Code</th><th>Color</th><th>Size</th><th>IN</th><th>OUT</th><th>NET</th>
-          </tr>
-        </thead>
-        <tbody id="summaryBody"></tbody>
-      </table>
-      <br>
-      <button onclick="closeSummary()">Close</button>
-    </div>
+<!-- DAILY SUMMARY MODAL -->
+<div id="summaryBox" class="modal hidden">
+  <div class="modalInner">
+    <h3>Daily Stock Movement</h3>
+    <input type="date" id="summaryDate">
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th><th>Color</th><th>Size</th><th>IN</th><th>OUT</th><th>NET</th>
+        </tr>
+      </thead>
+      <tbody id="summaryBody"></tbody>
+    </table>
+    <br>
+    <button onclick="closeSummary()">Close</button>
   </div>
-
-</div> <!-- end modalsContainer -->
-
-</div> <!-- end appUI -->
+</div>
 
 <script>
 // 🔥 Firebase config
@@ -132,6 +133,7 @@ const CLOUDINARY_PRESET = "inventory_unsigned";
 // GLOBALS
 let USER_ROLE = "staff";
 let ALL_DATA = {};
+let html5QrCode;
 
 // LOGIN
 function login(){
@@ -140,9 +142,10 @@ function login(){
   auth.signInWithEmailAndPassword(email,pwd).catch(e=>alert(e.message));
 }
 
-// AUTH + ROLE
+// AUTH STATE
 auth.onAuthStateChanged(async user=>{
   if(!user) return;
+
   loginBox.classList.add("hidden");
   appUI.classList.remove("hidden");
 
@@ -313,7 +316,36 @@ async function loadSummary(dateStr){
   });
   if(!tbody.innerHTML) tbody.innerHTML="<tr><td colspan='6'>No activity</td></tr>";
 }
-</script>
 
+// ✅ QR SCAN
+function startScan(){
+  qrScanner.classList.remove("hidden");
+  html5QrCode = new Html5Qrcode("qrScanner");
+  html5QrCode.start({ facingMode: "environment" }, 
+    { fps: 10, qrbox: 250 },
+    qrCodeMessage => {
+      navigator.vibrate?.(200); // vibration
+      const audio = new Audio('https://www.soundjay.com/buttons/sounds/beep-07.mp3'); audio.play(); // beep
+      filterQR(qrCodeMessage);
+      stopScan();
+    },
+    errorMessage => { /* ignore scan errors */ }
+  );
+}
+
+function stopScan(){
+  if(html5QrCode) html5QrCode.stop();
+  qrScanner.classList.add("hidden");
+}
+
+function filterQR(qrCodeMessage){
+  const q=qrCodeMessage.toLowerCase();
+  const f={};
+  Object.values(ALL_DATA).forEach(p=>{
+    if(p.code.toLowerCase()===q) f[p.code]=p;
+  });
+  render(f);
+}
+</script>
 </body>
 </html>
