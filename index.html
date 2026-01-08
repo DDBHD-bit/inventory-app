@@ -198,7 +198,11 @@ function render(){
   const grouped={};
 
   inventory.forEach(i=>{
-    if(!i.code.toLowerCase().includes(q)&&!i.name.toLowerCase().includes(q)) return;
+const codeMatch = i.code?.toLowerCase().includes(q);
+const nameMatch = (i.name || "").toLowerCase().includes(q);
+if(!codeMatch && !nameMatch) return;
+
+
     grouped[i.code]??={};
     grouped[i.code][i.color]??=[];
     grouped[i.code][i.color].push(i);
@@ -319,3 +323,4 @@ async function loadAudit(){
 
 </body>
 </html>
+
