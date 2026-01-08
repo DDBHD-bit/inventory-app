@@ -194,46 +194,72 @@ async function loadInventory(){
 
 function render(){
   list.innerHTML="";
-  const q=search.value.toLowerCase();
-  const grouped={};
+  const q = search.value.toLowerCase();
+  const grouped = {};
 
-  inventory.forEach(i=>{
-const codeMatch = i.code?.toLowerCase().includes(q);
-const nameMatch = (i.name || "").toLowerCase().includes(q);
-if(!codeMatch && !nameMatch) return;
+  inventory.forEach(raw=>{
+    // Normalize fields safely
+    const code = (raw.code || raw.productCode || "").toString();
+    const name = (raw.name || "").toString();
+    const color = (raw.color || "Default").toString();
+    const size = (raw.size || "Free").toString();
+    const qty = Number(raw.qty || 0);
 
+    if(!code) return;
 
-    grouped[i.code]??={};
-    grouped[i.code][i.color]??=[];
-    grouped[i.code][i.color].push(i);
+    const codeMatch = code.toLowerCase().includes(q);
+    const nameMatch = name.toLowerCase().includes(q);
+    if(q && !codeMatch && !nameMatch) return;
+
+    grouped[code] ??= {};
+    grouped[code][color] ??= [];
+    grouped[code][color].push({...raw, code, name, color, size, qty});
   });
 
+  if(Object.keys(grouped).length === 0){
+    list.innerHTML = `<div class="card">No products found</div>`;
+    return;
+  }
+
   Object.keys(grouped).forEach(code=>{
-    const first=grouped[code][Object.keys(grouped[code])[0]][0];
-    const card=document.createElement("div");
+    const firstColor = Object.keys(grouped[code])[0];
+    const firstItem = grouped[code][firstColor][0];
+
+    const card = document.createElement("div");
     card.className="card";
-    card.innerHTML=`
+    card.innerHTML = `
       <div class="product-header">
-        <img class="product-img" src="${first.image||''}">
-        <div><b>${code}</b><br>${first.name}</div>
+        <img class="product-img" src="${firstItem.image || ''}">
+        <div>
+          <b>${code}</b><br>
+          ${firstItem.name || ""}
+        </div>
       </div>
     `;
+
     Object.keys(grouped[code]).forEach(color=>{
-      card.innerHTML+=`<div><b>${color}</b></div>`;
+      card.innerHTML += `<div style="margin-top:6px"><b>${color}</b></div>`;
       grouped[code][color].forEach(i=>{
-        card.innerHTML+=`
-        <div style="margin-left:15px">
-          ${i.size} |
-          <span class="badge ${i.qty<5?'low':''}">Qty: ${i.qty}</span>
-          <button onclick="stock('${i.id}',1)">+</button>
-          <button onclick="stock('${i.id}',-1)">−</button>
-          ${role==="admin"?`<button class="danger" onclick="del('${i.id}')">Delete</button>`:""}
-        </div>`;
+        card.innerHTML += `
+          <div style="margin-left:15px">
+            ${i.size} |
+            <span class="badge ${i.qty < 5 ? 'low' : ''}">
+              Qty: ${i.qty}
+            </span>
+            <button onclick="stock('${i.id}',1)">+</button>
+            <button onclick="stock('${i.id}',-1)">−</button>
+            ${role==="admin"
+              ? `<button class="danger" onclick="del('${i.id}')">Delete</button>`
+              : ""}
+          </div>
+        `;
       });
     });
+
     list.appendChild(card);
   });
 }
+
 
 function openAdd(){ closeModals(); addModal.classList.remove("hidden"); }
 function openScan(){
@@ -323,4 +349,5 @@ async function loadAudit(){
 
 </body>
 </html>
+
 
