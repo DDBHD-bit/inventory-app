@@ -5,25 +5,27 @@
 <title>Inventory App</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+<!-- QR -->
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
 
 <style>
-body{font-family:Arial;background:#f4f6f8;margin:0}
-header{background:#2563eb;color:#fff;padding:12px;display:flex;justify-content:space-between}
-.container{padding:12px}
-.card{background:#fff;padding:12px;border-radius:10px;margin-bottom:12px}
-input,select,button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:1px solid #ccc}
+body{margin:0;font-family:Arial;background:#f1f5f9}
+header{background:#1e40af;color:#fff;padding:12px 16px;display:flex;justify-content:space-between}
+.container{padding:16px;max-width:900px;margin:auto}
+.card{background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 2px 6px rgba(0,0,0,.1)}
+input,button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:1px solid #ccc}
 button{background:#2563eb;color:#fff;border:none}
-.small{font-size:12px;color:#555}
-.product{display:flex;gap:10px}
-.product img{width:70px;height:70px;border-radius:8px;object-fit:cover}
-.low{color:red;font-weight:bold}
+button.secondary{background:#64748b}
 .hidden{display:none}
+.product{display:flex;gap:12px}
+.product img{width:80px;height:80px;border-radius:10px;object-fit:cover}
 .actions button{width:auto;margin-right:6px}
+.low{color:red;font-weight:bold}
 </style>
 </head>
 
@@ -46,7 +48,7 @@ button{background:#2563eb;color:#fff;border:none}
 
 <!-- APP -->
 <div class="container hidden" id="appBox">
-  <input id="search" placeholder="Search name / code / color / size" oninput="loadProducts()">
+  <input id="search" placeholder="Search..." oninput="loadProducts()">
   <button onclick="showAdd()">➕ Add Product</button>
   <div id="products"></div>
 </div>
@@ -57,82 +59,102 @@ button{background:#2563eb;color:#fff;border:none}
     <h3>Add Product</h3>
     <input id="pname" placeholder="Name">
     <input id="pcode" placeholder="Code">
-    <input id="pcolor" placeholder="Color (eg Blue)">
-    <input id="psize" placeholder="Size (eg M / L / XL)">
+    <input id="pcolor" placeholder="Color">
+    <input id="psize" placeholder="Size">
     <input id="pprice" type="number" placeholder="Price">
     <input id="pstock" type="number" placeholder="Stock">
     <input type="file" id="pimage" accept="image/*" capture="environment">
     <button onclick="addProduct()">Save</button>
-    <button onclick="hideAdd()">Cancel</button>
+    <button class="secondary" onclick="hideAdd()">Cancel</button>
   </div>
 </div>
 
-
 <script>
+// 🔐 Firebase config
 firebase.initializeApp({
-  apiKey:"AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
-  authDomain:"inventory-app-9f7a3.firebaseapp.com",
-  projectId:"inventory-app-9f7a3",
-  storageBucket:"inventory-app-9f7a3.firebasestorage.app"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID"
 });
 
-const auth=firebase.auth();
-const db=firebase.firestore();
-const storage=firebase.storage();
+const auth = firebase.auth();
+const db = firebase.firestore();
 
+// ☁️ Cloudinary
+const CLOUD_NAME = "YOUR_CLOUD_NAME";
+const UPLOAD_PRESET = "inventory_unsigned";
+
+// 🔐 Auth
 auth.onAuthStateChanged(u=>{
-  loginBox.classList.toggle("hidden",!!u);
-  appBox.classList.toggle("hidden",!u);
+  loginBox.classList.toggle("hidden", !!u);
+  appBox.classList.toggle("hidden", !u);
   if(u) loadProducts();
 });
 
 function login(){
-  auth.signInWithEmailAndPassword(email.value,password.value)
-  .catch(e=>alert(e.message));
+  auth.signInWithEmailAndPassword(email.value, password.value)
+    .catch(e=>alert(e.message));
 }
-
 function logout(){ auth.signOut(); }
 
-function showAdd(){ addBox.classList.remove("hidden"); }
-function hideAdd(){ addBox.classList.add("hidden"); }
-
-function compress(file){
-  return new Promise(r=>{
-    const i=new Image();
-    i.onload=()=>{
+// 📷 Image compression
+function compressImage(file){
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
       const c=document.createElement("canvas");
-      c.width=600; c.height=600*(i.height/i.width);
-      c.getContext("2d").drawImage(i,0,0,c.width,c.height);
-      c.toBlob(b=>r(b),"image/jpeg",0.7);
+      const max=800;
+      let w=img.width,h=img.height;
+      if(w>h && w>max){h*=max/w;w=max}
+      else if(h>max){w*=max/h;h=max}
+      c.width=w;c.height=h;
+      c.getContext("2d").drawImage(img,0,0,w,h);
+      c.toBlob(b=>resolve(b),"image/jpeg",0.7);
     };
-    i.src=URL.createObjectURL(file);
+    img.src=URL.createObjectURL(file);
   });
 }
 
-async function addProduct(){
-  const blob=await compress(pimage.files[0]);
-  const ref=storage.ref("products/"+Date.now()+".jpg");
-  await ref.put(blob);
-  const url=await ref.getDownloadURL();
+// ☁️ Upload to Cloudinary
+async function uploadToCloudinary(file){
+  const blob=await compressImage(file);
+  const fd=new FormData();
+  fd.append("file",blob);
+  fd.append("upload_preset",UPLOAD_PRESET);
 
-  await db.collection("inventory").add({
+  const res=await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+    {method:"POST",body:fd}
+  );
+  const data=await res.json();
+  return data.secure_url;
+}
+
+// ➕ Add product
+async function addProduct(){
+  if(!pimage.files[0]) return alert("Image required");
+  const imageUrl=await uploadToCloudinary(pimage.files[0]);
+
+  await db.collection("products").add({
     name:pname.value,
     code:pcode.value,
     color:pcolor.value,
     size:psize.value,
     price:+pprice.value,
     stock:+pstock.value,
-    image:url,
+    image:imageUrl,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   });
 
-  hideAdd(); loadProducts();
+  hideAdd();
+  loadProducts();
 }
 
+// 📦 Load products
 async function loadProducts(){
   products.innerHTML="";
   const q=search.value.toLowerCase();
-  const snap=await db.collection("inventory").get();
+  const snap=await db.collection("products").get();
 
   snap.forEach(d=>{
     const p=d.data();
@@ -145,7 +167,7 @@ async function loadProducts(){
       <img src="${p.image}">
       <div>
         <b>${p.name}</b> (${p.color}, ${p.size})<br>
-        <span class="small">${p.code}</span><br>
+        ${p.code}<br>
         ₹${p.price}<br>
         <span class="${p.stock<5?'low':''}">Stock: ${p.stock}</span>
         <div class="actions">
@@ -155,18 +177,20 @@ async function loadProducts(){
         <div id="qr${d.id}"></div>
       </div>`;
     products.appendChild(div);
-    new QRCode("qr"+d.id,p.code);
+    new QRCode("qr"+d.id, p.code);
   });
 }
 
-async function updateStock(id,d){
-  const ref=db.collection("inventory").doc(id);
+async function updateStock(id,delta){
+  const ref=db.collection("products").doc(id);
   const doc=await ref.get();
-  ref.update({stock:doc.data().stock+d});
+  await ref.update({stock:doc.data().stock+delta});
   loadProducts();
 }
+
+function showAdd(){ addBox.classList.remove("hidden"); }
+function hideAdd(){ addBox.classList.add("hidden"); }
 </script>
+
 </body>
 </html>
-
-
