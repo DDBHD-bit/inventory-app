@@ -156,34 +156,74 @@ async function addProduct(){
 
 // 📦 Load products
 async function loadProducts(){
-  products.innerHTML="";
-  const q=search.value.toLowerCase();
-  const snap=await db.collection("inventory").get();
+  products.innerHTML = "";
+  const q = search.value.toLowerCase();
 
-  snap.forEach(d=>{
-    const p=d.data();
-    const text=(p.name+p.code+p.color+p.size).toLowerCase();
-    if(q && !text.includes(q)) return;
+  const snap = await db.collection("inventory").get();
+  const grouped = {};
 
-    const div=document.createElement("div");
-    div.className="card product";
-    div.innerHTML=`
-      <img src="${p.image}">
-      <div>
-        <b>${p.name}</b> (${p.color}, ${p.size})<br>
-        ${p.code}<br>
-        ₹${p.price}<br>
-        <span class="${p.stock<5?'low':''}">Stock: ${p.stock}</span>
-        <div class="actions">
-          <button onclick="updateStock('${d.id}',1)">IN</button>
-          <button onclick="updateStock('${d.id}',-1)">OUT</button>
-        </div>
-        <div id="qr${d.id}"></div>
-      </div>`;
-    products.appendChild(div);
-    new QRCode("qr"+d.id, p.code);
-  });
+  // 1️⃣ GROUP DATA
+  snap.forEach(doc => {
+    const p = doc.data();
+    const text = `${p.name} ${p.code} ${p.color} ${p.size}`.toLowerCase();
+    if (q && !text.includes(q)) return;
+
+    if (!grouped[p.code]) grouped[p.code] = {};
+    if (!grouped[p.code][p.color]) grouped[p.code][p.color] = [];
+
+    grouped[p.code][p.color].push({ id: doc.id, ...p });
+  });
+
+  if (Object.keys(grouped).length === 0) {
+    products.innerHTML = `<div class="card">No products found</div>`;
+    return;
+  }
+
+  // 2️⃣ RENDER GROUPED VIEW
+  Object.keys(grouped).forEach(code => {
+    const codeCard = document.createElement("div");
+    codeCard.className = "card";
+    codeCard.innerHTML = `
+      <div class="group-title">Product Code: ${code}</div>
+      <div id="qr-${code}"></div>
+    `;
+
+    Object.keys(grouped[code]).forEach(color => {
+      const colorBlock = document.createElement("div");
+      colorBlock.className = "sub";
+      colorBlock.innerHTML = `<b>Color: ${color}</b>`;
+
+      grouped[code][color].forEach(p => {
+        const row = document.createElement("div");
+        row.className = "product sub";
+        row.innerHTML = `
+          <img src="${p.image}">
+          <div>
+            <b>${p.name}</b><br>
+            Size: ${p.size}<br>
+            ₹${p.price}<br>
+            <span class="${p.stock < 5 ? 'low' : ''}">
+              Stock: ${p.stock}
+            </span>
+            <div class="actions">
+              <button onclick="updateStock('${p.id}',1)">IN</button>
+              <button onclick="updateStock('${p.id}',-1)">OUT</button>
+            </div>
+          </div>
+        `;
+        colorBlock.appendChild(row);
+      });
+
+      codeCard.appendChild(colorBlock);
+    });
+
+    products.appendChild(codeCard);
+
+    // 3️⃣ QR ONCE PER CODE
+    new QRCode(document.getElementById(`qr-${code}`), code);
+  });
 }
+
 
 async function updateStock(id,delta){
   const ref=db.collection("inventory").doc(id);
@@ -198,3 +238,4 @@ function hideAdd(){ addBox.classList.add("hidden"); }
 
 </body>
 </html>
+
