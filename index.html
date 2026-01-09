@@ -5,354 +5,192 @@
 <title>Inventory App</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<!-- QR -->
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+
 <style>
-body { font-family: Arial, sans-serif; margin:0; background:#f3f4f6; }
-.hidden { display:none !important; }
-
-header {
-  background:#111827; color:white; padding:12px;
-  display:flex; justify-content:space-between; align-items:center;
-}
-
-button {
-  padding:6px 10px;
-  border:none; border-radius:6px;
-  background:#2563eb; color:white;
-  cursor:pointer; font-size:14px;
-}
-
-button.secondary { background:#6b7280; }
-button.danger { background:#dc2626; }
-
-input {
-  width:100%; padding:8px;
-  margin-bottom:8px;
-  border-radius:6px; border:1px solid #ccc;
-}
-
-.card {
-  background:white;
-  border-radius:12px;
-  padding:12px;
-  margin-bottom:12px;
-  box-shadow:0 4px 10px rgba(0,0,0,0.05);
-}
-
-.product-header {
-  display:flex; gap:10px; align-items:center;
-}
-
-.product-img {
-  width:60px; height:60px;
-  border-radius:8px;
-  object-fit:cover;
-  background:#e5e7eb;
-}
-
-.badge {
-  padding:2px 8px;
-  border-radius:12px;
-  font-size:12px;
-  background:#e5e7eb;
-}
-
-.low { background:#fee2e2; color:#991b1b; }
-
-.modal {
-  position:fixed; inset:0;
-  background:rgba(0,0,0,0.5);
-  display:flex; align-items:center; justify-content:center;
-  z-index:1000;
-}
-
-.modal-content {
-  background:white;
-  padding:20px;
-  width:90%;
-  max-width:480px;
-  border-radius:12px;
-}
+body{margin:0;font-family:Arial;background:#f1f5f9}
+header{background:#1e40af;color:#fff;padding:12px 16px;display:flex;justify-content:space-between}
+.container{padding:16px;max-width:900px;margin:auto}
+.card{background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 2px 6px rgba(0,0,0,.1)}
+input,button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:1px solid #ccc}
+button{background:#2563eb;color:#fff;border:none}
+button.secondary{background:#64748b}
+.hidden{display:none}
+.product{display:flex;gap:12px}
+.product img{width:80px;height:80px;border-radius:10px;object-fit:cover}
+.actions button{width:auto;margin-right:6px}
+.low{color:red;font-weight:bold}
 </style>
 </head>
 
 <body>
 
+<header>
+  <b>Inventory</b>
+  <button onclick="logout()">Logout</button>
+</header>
+
 <!-- LOGIN -->
-<div id="loginScreen">
-  <div class="card">
-    <h3>Login</h3>
-    <input id="email" placeholder="Email">
-    <input id="password" type="password" placeholder="Password">
-    <button onclick="login()">Login</button>
-  </div>
+<div class="container" id="loginBox">
+  <div class="card">
+    <h3>Login</h3>
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+  </div>
 </div>
 
 <!-- APP -->
-<div id="appScreen" class="hidden">
-
-<header>
-  <div>Inventory</div>
-  <div>
-    <button onclick="openScan()">Scan QR</button>
-    <button onclick="openAdd()">Add</button>
-    <button class="secondary" onclick="openSummary()">Summary</button>
-    <button class="secondary" onclick="openAudit()">Audit</button>
-    <button class="danger" onclick="logout()">Logout</button>
-  </div>
-</header>
-
-<div style="padding:10px">
-  <input id="search" placeholder="Search code / name" oninput="render()">
-  <div id="list"></div>
-</div>
-
+<div class="container hidden" id="appBox">
+  <input id="search" placeholder="Search..." oninput="loadProducts()">
+  <button onclick="showAdd()">➕ Add Product</button>
+  <div id="products"></div>
 </div>
 
 <!-- ADD PRODUCT -->
-<div id="addModal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Add / Update Product</h3>
-    <input id="pCode" placeholder="Code">
-    <input id="pName" placeholder="Name">
-    <input id="pColor" placeholder="Color">
-    <input id="pSize" placeholder="Size">
-    <input id="pQty" type="number" placeholder="Quantity">
-    <input type="file" id="pImage" accept="image/*" capture="environment">
-    <button onclick="saveProduct()">Save</button>
-    <button class="secondary" onclick="closeModals()">Close</button>
-  </div>
+<div class="container hidden" id="addBox">
+  <div class="card">
+    <h3>Add Product</h3>
+    <input id="pname" placeholder="Name">
+    <input id="pcode" placeholder="Code">
+    <input id="pcolor" placeholder="Color">
+    <input id="psize" placeholder="Size">
+    <input id="pprice" type="number" placeholder="Price">
+    <input id="pstock" type="number" placeholder="Stock">
+    <input type="file" id="pimage" accept="image/*" capture="environment">
+    <button onclick="addProduct()">Save</button>
+    <button class="secondary" onclick="hideAdd()">Cancel</button>
+  </div>
 </div>
-
-<!-- QR -->
-<div id="scanModal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Scan QR</h3>
-    <div id="qr-reader"></div>
-    <button class="secondary" onclick="closeModals()">Close</button>
-  </div>
-</div>
-
-<!-- SUMMARY -->
-<div id="summaryModal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Daily Stock Movement</h3>
-    <div id="summary"></div>
-    <button class="secondary" onclick="closeModals()">Close</button>
-  </div>
-</div>
-
-<!-- AUDIT -->
-<div id="auditModal" class="modal hidden">
-  <div class="modal-content">
-    <h3>Audit Logs</h3>
-    <div id="audit"></div>
-    <button class="secondary" onclick="closeModals()">Close</button>
-  </div>
-</div>
-
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="https://unpkg.com/html5-qrcode"></script>
 
 <script>
-firebase.initializeApp(  apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
-  authDomain: "inventory-app-9f7a3.firebaseapp.com",
-  projectId: "inventory-app-9f7a3");
-const auth=firebase.auth();
-const db=firebase.firestore();
+// 🔐 Firebase config
+firebase.initializeApp({
+  apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
+  authDomain: "inventory-app-9f7a3.firebaseapp.com",
+  projectId: "inventory-app-9f7a3"
+});
 
-const CLOUDINARY_NAME="dahxnopuw";
-const CLOUDINARY_PRESET="inventory_unsigned";
+const auth = firebase.auth();
+const db = firebase.firestore();
 
-let inventory=[], role="staff", scanner=null;
+// ☁️ Cloudinary
+const CLOUD_NAME = "dahxnopuw";
+const UPLOAD_PRESET = "inventory_unsigned";
 
-auth.onAuthStateChanged(async user=>{
-  if(!user){
-    loginScreen.classList.remove("hidden");
-    appScreen.classList.add("hidden");
-    return;
-  }
-  const u=await db.collection("users").doc(user.uid).get();
-  role=u.exists?u.data().role:"staff";
-  loginScreen.classList.add("hidden");
-  appScreen.classList.remove("hidden");
-  loadInventory();
+// 🔐 Auth
+auth.onAuthStateChanged(u=>{
+  loginBox.classList.toggle("hidden", !!u);
+  appBox.classList.toggle("hidden", !u);
+  if(u) loadProducts();
 });
 
 function login(){
-  const emailVal = document.getElementById("email").value;
-  const passVal = document.getElementById("password").value;
-
-  auth.signInWithEmailAndPassword(emailVal, passVal)
-    .catch(err => alert(err.message));
+  auth.signInWithEmailAndPassword(email.value, password.value)
+    .catch(e=>alert(e.message));
 }
-
 function logout(){ auth.signOut(); }
 
-async function loadInventory(){
-  const s=await db.collection("inventory").get();
-  inventory=s.docs.map(d=>({id:d.id,...d.data()}));
-  render();
+// 📷 Image compression
+function compressImage(file){
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement("canvas");
+      const max=800;
+      let w=img.width,h=img.height;
+      if(w>h && w>max){h*=max/w;w=max}
+      else if(h>max){w*=max/h;h=max}
+      c.width=w;c.height=h;
+      c.getContext("2d").drawImage(img,0,0,w,h);
+      c.toBlob(b=>resolve(b),"image/jpeg",0.7);
+    };
+    img.src=URL.createObjectURL(file);
+  });
 }
 
-function render(){
-  list.innerHTML="";
-  const q = search.value.toLowerCase();
-  const grouped = {};
+// ☁️ Upload to Cloudinary
+async function uploadToCloudinary(file){
+  const blob=await compressImage(file);
+  const fd=new FormData();
+  fd.append("file",blob);
+  fd.append("upload_preset",UPLOAD_PRESET);
 
-  inventory.forEach(raw=>{
-    // Normalize fields safely
-    const code = (raw.code || raw.productCode || "").toString();
-    const name = (raw.name || "").toString();
-    const color = (raw.color || "Default").toString();
-    const size = (raw.size || "Free").toString();
-    const qty = Number(raw.qty || 0);
-
-    if(!code) return;
-
-    const codeMatch = code.toLowerCase().includes(q);
-    const nameMatch = name.toLowerCase().includes(q);
-    if(q && !codeMatch && !nameMatch) return;
-
-    grouped[code] ??= {};
-    grouped[code][color] ??= [];
-    grouped[code][color].push({...raw, code, name, color, size, qty});
-  });
-
-  if(Object.keys(grouped).length === 0){
-    list.innerHTML = `<div class="card">No products found</div>`;
-    return;
-  }
-
-  Object.keys(grouped).forEach(code=>{
-    const firstColor = Object.keys(grouped[code])[0];
-    const firstItem = grouped[code][firstColor][0];
-
-    const card = document.createElement("div");
-    card.className="card";
-    card.innerHTML = `
-      <div class="product-header">
-        <img class="product-img" src="${firstItem.image || ''}">
-        <div>
-          <b>${code}</b><br>
-          ${firstItem.name || ""}
-        </div>
-      </div>
-    `;
-
-    Object.keys(grouped[code]).forEach(color=>{
-      card.innerHTML += `<div style="margin-top:6px"><b>${color}</b></div>`;
-      grouped[code][color].forEach(i=>{
-        card.innerHTML += `
-          <div style="margin-left:15px">
-            ${i.size} |
-            <span class="badge ${i.qty < 5 ? 'low' : ''}">
-              Qty: ${i.qty}
-            </span>
-            <button onclick="stock('${i.id}',1)">+</button>
-            <button onclick="stock('${i.id}',-1)">−</button>
-            ${role==="admin"
-              ? `<button class="danger" onclick="del('${i.id}')">Delete</button>`
-              : ""}
-          </div>
-        `;
-      });
-    });
-
-    list.appendChild(card);
-  });
+  const res=await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+    {method:"POST",body:fd}
+  );
+  const data=await res.json();
+  return data.secure_url;
 }
 
+// ➕ Add product
+async function addProduct(){
+  if(!pimage.files[0]) return alert("Image required");
+  const imageUrl=await uploadToCloudinary(pimage.files[0]);
 
-function openAdd(){ closeModals(); addModal.classList.remove("hidden"); }
-function openScan(){
-  closeModals(); scanModal.classList.remove("hidden");
-  scanner=new Html5Qrcode("qr-reader");
-  scanner.start({facingMode:"environment"},{fps:10,qrbox:250},txt=>{
-    scanner.stop(); closeModals();
-    search.value=txt; render();
-    navigator.vibrate?.(200);
-  });
-}
-function openSummary(){ closeModals(); summaryModal.classList.remove("hidden"); }
-function openAudit(){ closeModals(); loadAudit(); auditModal.classList.remove("hidden"); }
+  await db.collection("inventory").add({
+    name:pname.value,
+    code:pcode.value,
+    color:pcolor.value,
+    size:psize.value,
+    price:+pprice.value,
+    stock:+pstock.value,
+    image:imageUrl,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  });
 
-function closeModals(){
-  document.querySelectorAll(".modal").forEach(m=>m.classList.add("hidden"));
-}
-
-document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModals(); });
-
-async function compress(f){
-  return new Promise(r=>{
-    const i=new Image();
-    i.onload=()=>{
-      const c=document.createElement("canvas");
-      const s=Math.min(1,800/i.width);
-      c.width=i.width*s; c.height=i.height*s;
-      c.getContext("2d").drawImage(i,0,0,c.width,c.height);
-      c.toBlob(b=>r(b),"image/jpeg",0.7);
-    };
-    i.src=URL.createObjectURL(f);
-  });
+  hideAdd();
+  loadProducts();
 }
 
-async function upload(file){
-  const fd=new FormData();
-  fd.append("file",file);
-  fd.append("upload_preset",CLOUDINARY_PRESET);
-  const r=await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_NAME}/image/upload`,{method:"POST",body:fd});
-  return (await r.json()).secure_url;
+// 📦 Load products
+async function loadProducts(){
+  products.innerHTML="";
+  const q=search.value.toLowerCase();
+  const snap=await db.collection("inventory").get();
+
+  snap.forEach(d=>{
+    const p=d.data();
+    const text=(p.name+p.code+p.color+p.size).toLowerCase();
+    if(q && !text.includes(q)) return;
+
+    const div=document.createElement("div");
+    div.className="card product";
+    div.innerHTML=`
+      <img src="${p.image}">
+      <div>
+        <b>${p.name}</b> (${p.color}, ${p.size})<br>
+        ${p.code}<br>
+        ₹${p.price}<br>
+        <span class="${p.stock<5?'low':''}">Stock: ${p.stock}</span>
+        <div class="actions">
+          <button onclick="updateStock('${d.id}',1)">IN</button>
+          <button onclick="updateStock('${d.id}',-1)">OUT</button>
+        </div>
+        <div id="qr${d.id}"></div>
+      </div>`;
+    products.appendChild(div);
+    new QRCode("qr"+d.id, p.code);
+  });
 }
 
-async function saveProduct(){
-  let img="";
-  if(pImage.files[0]) img=await upload(await compress(pImage.files[0]));
-
-  const q=await db.collection("inventory")
-    .where("code","==",pCode.value)
-    .where("color","==",pColor.value)
-    .where("size","==",pSize.value).get();
-
-  if(q.empty){
-    await db.collection("inventory").add({
-      code:pCode.value,name:pName.value,color:pColor.value,
-      size:pSize.value,qty:+pQty.value,image:img
-    });
-  } else {
-    const d=q.docs[0];
-    await d.ref.update({qty:d.data().qty+(+pQty.value),image:img||d.data().image});
-  }
-
-  await db.collection("audit_logs").add({type:"ADD",code:pCode.value,at:new Date()});
-  closeModals(); loadInventory();
+async function updateStock(id,delta){
+  const ref=db.collection("inventory").doc(id);
+  const doc=await ref.get();
+  await ref.update({stock:doc.data().stock+delta});
+  loadProducts();
 }
 
-async function stock(id,d){
-  const r=db.collection("inventory").doc(id);
-  const s=await r.get();
-  await r.update({qty:s.data().qty+d});
-  await db.collection("audit_logs").add({type:d>0?"IN":"OUT",code:s.data().code,at:new Date()});
-  loadInventory();
-}
-
-async function del(id){
-  if(!confirm("Delete permanently?")) return;
-  const d=await db.collection("inventory").doc(id).get();
-  await d.ref.delete();
-  await db.collection("audit_logs").add({type:"DELETE",code:d.data().code,at:new Date()});
-  loadInventory();
-}
-
-async function loadAudit(){
-  const s=await db.collection("audit_logs").orderBy("at","desc").limit(20).get();
-  audit.innerHTML=s.docs.map(d=>JSON.stringify(d.data())).join("<hr>");
-}
+function showAdd(){ addBox.classList.remove("hidden"); }
+function hideAdd(){ addBox.classList.add("hidden"); }
 </script>
 
 </body>
 </html>
-
-
-
