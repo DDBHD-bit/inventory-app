@@ -91,11 +91,15 @@ auth.onAuthStateChanged(u=>{
   if(u) loadProducts();
 });
 
-function login(){
-  auth.signInWithEmailAndPassword(email.value, password.value)
-    .catch(e=>alert(e.message));
+window.login = function(){
+  auth.signInWithEmailAndPassword(email.value,password.value)
+    .catch(e=>alert(e.message));
 }
-function logout(){ auth.signOut(); }
+
+window.logout = function(){
+  auth.signOut();
+}
+
 
 // 📷 Image compression
 function compressImage(file){
