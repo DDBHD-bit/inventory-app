@@ -239,12 +239,27 @@ async function loadProducts(){
 
 
 
-async function updateStock(id,delta){
-  const ref=db.collection("inventory").doc(id);
-  const doc=await ref.get();
-  await ref.update({stock:doc.data().stock+delta});
-  loadProducts();
-}
+window.updateStock = async function(id, delta) {
+  try {
+    const ref = db.collection("inventory").doc(id);
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      alert("Item not found");
+      return;
+    }
+
+    const newStock = (snap.data().stock || 0) + delta;
+    if (newStock < 0) return alert("Stock cannot be negative");
+
+    await ref.update({ stock: newStock });
+    loadProducts();
+  } catch (e) {
+    alert(e.message);
+    console.error(e);
+  }
+};
+
 
 function showAdd(){ addBox.classList.remove("hidden"); }
 function hideAdd(){ addBox.classList.add("hidden"); }
@@ -252,6 +267,7 @@ function hideAdd(){ addBox.classList.add("hidden"); }
 
 </body>
 </html>
+
 
 
 
