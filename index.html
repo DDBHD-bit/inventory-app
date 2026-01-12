@@ -218,8 +218,13 @@ async function loadProducts(){
           <span class="${s.stock < 5 ? 'low' : ''}">
             Stock: ${s.stock}
           </span>
-          <button onclick="updateStock('${s.id}',1)">IN</button>
-          <button onclick="updateStock('${s.id}',-1)">OUT</button>
+
+<button type="button" onclick="updateStock('${s.id}',1)">IN</button>
+<button type="button" onclick="updateStock('${s.id}',-1)">OUT</button>
+
+
+
+          
         `;
         sizeList.appendChild(row);
       });
@@ -247,5 +252,6 @@ function hideAdd(){ addBox.classList.add("hidden"); }
 
 </body>
 </html>
+
 
 
