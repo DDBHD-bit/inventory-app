@@ -354,12 +354,69 @@ window.updateStock = async function(id, delta){
   await ref.update({ stock: updated });
   loadProducts();
 };
+window.openAudit = async function(){
+  auditBox.classList.remove("hidden");
+  auditList.innerHTML = "Loading...";
 
+  const snap = await db.collection("audit_logs")
+    .orderBy("timestamp","desc")
+    .limit(50)
+    .get();
+
+  auditList.innerHTML = "";
+
+  snap.forEach(d=>{
+    const a = d.data();
+    auditList.innerHTML += `
+      <div class="card">
+        <b>${a.type}</b> | ${a.code}<br>
+        ${a.color} | ${a.size}<br>
+        Qty: ${a.change}<br>
+        By: ${a.user}<br>
+        <small>${a.timestamp?.toDate().toLocaleString()}</small>
+      </div>
+    `;
+  });
+};
+
+window.closeAudit = function(){
+  auditBox.classList.add("hidden");
+};
+
+window.openSummary = async function(){
+  summaryBox.classList.remove("hidden");
+  summaryList.innerHTML = "Loading...";
+
+  const start = new Date();
+  start.setHours(0,0,0,0);
+
+  const snap = await db.collection("audit_logs")
+    .where("timestamp", ">=", start)
+    .get();
+
+  let totalIn = 0, totalOut = 0;
+
+  snap.forEach(d=>{
+    const a = d.data();
+    if(a.type === "IN") totalIn += a.change;
+    if(a.type === "OUT") totalOut += a.change;
+  });
+
+  summaryList.innerHTML = `
+    <div class="card">Total Stock IN: <b>${totalIn}</b></div>
+    <div class="card">Total Stock OUT: <b>${totalOut}</b></div>
+  `;
+};
+
+window.closeSummary = function(){
+  summaryBox.classList.add("hidden");
+};  
   
 </script>
 
 </body>
 </html>
+
 
 
 
