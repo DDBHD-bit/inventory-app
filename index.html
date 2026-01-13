@@ -37,6 +37,8 @@ button.secondary{background:#64748b}
 
 <header>
   <b>Inventory</b>
+  <button onclick="openAudit()">Audit</button>
+  <button onclick="openSummary()">Daily Summary</button>  
   <button onclick="logout()">Logout</button>
 </header>
 
@@ -93,7 +95,26 @@ button.secondary{background:#64748b}
     <button class="secondary" onclick="hideAdd()">Cancel</button>
   </div>
 </div>
+<!-- AUDIT LOG MODAL -->
+<div class="container hidden" id="auditBox">
+  <div class="card">
+    <h3>Audit Logs</h3>
+    <div id="auditList"></div>
+    <button class="secondary" onclick="closeAudit()">Close</button>
+  </div>
+</div>
 
+<!-- DAILY SUMMARY MODAL -->
+<div class="container hidden" id="summaryBox">
+  <div class="card">
+    <h3>Today's Stock Movement</h3>
+    <div id="summaryList"></div>
+    <button class="secondary" onclick="closeSummary()">Close</button>
+  </div>
+</div>
+
+
+  
 <script>
 /* ================= FIREBASE ================= */
 firebase.initializeApp({
@@ -170,7 +191,16 @@ async function addProduct(){
     image,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   });
-
+await db.collection("audit_logs").add({
+  productId: "NEW",
+  code: pcode.value,
+  color: pcolor.value,
+  size: psize.value,
+  change: Number(pstock.value),
+  type: "ADD",
+  user: auth.currentUser.email,
+  timestamp: firebase.firestore.FieldValue.serverTimestamp()
+});
   hideAdd();
   loadProducts();
 }
@@ -236,12 +266,41 @@ async function loadProducts(){
 }
 
 /* ================= STOCK ================= */
+
 async function updateStock(id,delta){
-  const ref=db.collection("inventory").doc(id);
-  const snap=await ref.get();
-  await ref.update({stock:(snap.data().stock||0)+delta});
+  const ref = db.collection("inventory").doc(id);
+  const snap = await ref.get();
+
+  if(!snap.exists){
+    alert("Product not found");
+    return;
+  }
+
+  const p = snap.data();
+  const newStock = (p.stock || 0) + delta;
+
+  if(newStock < 0){
+    alert("Stock cannot be negative");
+    return;
+  }
+
+  // update inventory
+  await ref.update({ stock: newStock });
+
+  // audit log
+  await db.collection("audit_logs").add({
+    productId: id,
+    code: p.code,
+    color: p.color,
+    size: p.size,
+    change: Math.abs(delta),
+    type: delta > 0 ? "IN" : "OUT",
+    user: auth.currentUser.email,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
   loadProducts();
-}
+};
 
 
 
@@ -301,6 +360,7 @@ window.updateStock = async function(id, delta){
 
 </body>
 </html>
+
 
 
 
