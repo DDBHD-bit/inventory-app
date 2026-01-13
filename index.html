@@ -224,8 +224,8 @@ async function loadProducts(){
             Size <b>${s.size}</b> |
             ₹${s.price} |
             <span class="${s.stock<5?'low':''}">Stock ${s.stock}</span>
-            <button onclick="stockPrompt('${s.id}','IN')">IN</button>
-            <button onclick="stockPrompt('${s.id}','OUT')">OUT</button>
+            <button type="button" onclick="stockPrompt('${s.id}','IN')">IN</button>
+            <button type="button" onclick="stockPrompt('${s.id}','OUT')">OUT</button>
           </div>
         `;
       });
@@ -242,31 +242,40 @@ async function updateStock(id,delta){
   await ref.update({stock:(snap.data().stock||0)+delta});
   loadProducts();
 }
-/* ================= STOCK PROMPT ================= */
 
-async function stockPrompt(id, type){
+
+
+
+/* ================= STOCK PROMPT (GLOBAL) ================= */
+
+window.stockPrompt = async function(id, type){
+  console.log("Button clicked:", id, type); // DEBUG (keep for now)
+
   let qty = prompt(
     type === "IN"
       ? "Enter quantity to ADD"
       : "Enter quantity to DEDUCT"
   );
 
-  if(qty === null) return; // Cancel pressed
+  if(qty === null) return;
+
   qty = Number(qty);
 
   if(isNaN(qty) || qty <= 0){
-    alert("Please enter a valid number");
+    alert("Enter a valid number");
     return;
   }
 
   if(type === "OUT") qty = -qty;
 
-  updateStock(id, qty);
-}
+  await window.updateStock(id, qty);
+};
 
-/* ================= UPDATE STOCK ================= */
+/* ================= UPDATE STOCK (GLOBAL) ================= */
 
-async function updateStock(id, delta){
+window.updateStock = async function(id, delta){
+  console.log("Updating stock:", id, delta); // DEBUG
+
   const ref = db.collection("inventory").doc(id);
   const snap = await ref.get();
 
@@ -275,7 +284,7 @@ async function updateStock(id, delta){
     return;
   }
 
-  const current = snap.data().stock || 0;
+  const current = Number(snap.data().stock || 0);
   const updated = current + delta;
 
   if(updated < 0){
@@ -285,12 +294,13 @@ async function updateStock(id, delta){
 
   await ref.update({ stock: updated });
   loadProducts();
-}
+};
 
   
 </script>
 
 </body>
 </html>
+
 
 
