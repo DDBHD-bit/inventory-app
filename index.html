@@ -224,8 +224,8 @@ async function loadProducts(){
             Size <b>${s.size}</b> |
             ₹${s.price} |
             <span class="${s.stock<5?'low':''}">Stock ${s.stock}</span>
-            <button onclick="updateStock('${s.id}',1)">IN</button>
-            <button onclick="updateStock('${s.id}',-1)">OUT</button>
+            <button onclick="stockPrompt('${s.id}','IN')">IN</button>
+            <button onclick="stockPrompt('${s.id}','OUT')">OUT</button>
           </div>
         `;
       });
@@ -242,8 +242,55 @@ async function updateStock(id,delta){
   await ref.update({stock:(snap.data().stock||0)+delta});
   loadProducts();
 }
+/* ================= STOCK PROMPT ================= */
+
+async function stockPrompt(id, type){
+  let qty = prompt(
+    type === "IN"
+      ? "Enter quantity to ADD"
+      : "Enter quantity to DEDUCT"
+  );
+
+  if(qty === null) return; // Cancel pressed
+  qty = Number(qty);
+
+  if(isNaN(qty) || qty <= 0){
+    alert("Please enter a valid number");
+    return;
+  }
+
+  if(type === "OUT") qty = -qty;
+
+  updateStock(id, qty);
+}
+
+/* ================= UPDATE STOCK ================= */
+
+async function updateStock(id, delta){
+  const ref = db.collection("inventory").doc(id);
+  const snap = await ref.get();
+
+  if(!snap.exists){
+    alert("Product not found");
+    return;
+  }
+
+  const current = snap.data().stock || 0;
+  const updated = current + delta;
+
+  if(updated < 0){
+    alert("Stock cannot be negative");
+    return;
+  }
+
+  await ref.update({ stock: updated });
+  loadProducts();
+}
+
+  
 </script>
 
 </body>
 </html>
+
 
