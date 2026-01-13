@@ -267,39 +267,53 @@ async function loadProducts(){
 
 /* ================= STOCK ================= */
 
-async function updateStock(id,delta){
-  const ref = db.collection("inventory").doc(id);
-  const snap = await ref.get();
+window.updateStock = async function(id, delta){
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      alert("User not authenticated");
+      return;
+    }
 
-  if(!snap.exists){
-    alert("Product not found");
-    return;
+    const ref = db.collection("inventory").doc(id);
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      alert("Product not found");
+      return;
+    }
+
+    const p = snap.data();
+    const currentStock = Number(p.stock || 0);
+    const newStock = currentStock + delta;
+
+    if (newStock < 0) {
+      alert("Stock cannot be negative");
+      return;
+    }
+
+    // 1️⃣ Update stock
+    await ref.update({ stock: newStock });
+
+    // 2️⃣ Save audit log
+    await db.collection("audit_logs").add({
+      productId: id,
+      code: p.code || "",
+      color: p.color || "",
+      size: p.size || "",
+      change: Math.abs(delta),
+      type: delta > 0 ? "IN" : "OUT",
+      user: user.email,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    console.log("Audit log saved successfully");
+    loadProducts();
+
+  } catch (err) {
+    console.error("Audit log error:", err);
+    alert("Failed to save audit log. Check console.");
   }
-
-  const p = snap.data();
-  const newStock = (p.stock || 0) + delta;
-
-  if(newStock < 0){
-    alert("Stock cannot be negative");
-    return;
-  }
-
-  // update inventory
-  await ref.update({ stock: newStock });
-
-  // audit log
-  await db.collection("audit_logs").add({
-    productId: id,
-    code: p.code,
-    color: p.color,
-    size: p.size,
-    change: Math.abs(delta),
-    type: delta > 0 ? "IN" : "OUT",
-    user: auth.currentUser.email,
-    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-  });
-
-  loadProducts();
 };
 
 
@@ -416,6 +430,7 @@ window.closeSummary = function(){
 
 </body>
 </html>
+
 
 
 
