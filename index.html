@@ -10,262 +10,227 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-<!-- QR -->
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
-
 <style>
 body{margin:0;font-family:Arial;background:#f1f5f9}
-header{background:#1e40af;color:#fff;padding:12px 16px;display:flex;justify-content:space-between}
+header{background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:12px 16px;display:flex;justify-content:space-between}
 .container{padding:16px;max-width:900px;margin:auto}
 .card{background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 2px 6px rgba(0,0,0,.1)}
-input,button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:1px solid #ccc}
-button{background:#2563eb;color:#fff;border:none}
+input,select,button{width:100%;padding:10px;margin-top:8px;border-radius:8px;border:1px solid #ccc}
+button{background:#2563eb;color:#fff;border:none;cursor:pointer}
 button.secondary{background:#64748b}
 .hidden{display:none}
-.product{display:flex;gap:12px}
+.product{display:flex;gap:12px;margin-top:10px}
 .product img{width:80px;height:80px;border-radius:10px;object-fit:cover}
-.actions button{width:auto;margin-right:6px}
-.low{color:red;font-weight:bold}
+.low{color:#dc2626;font-weight:bold}
+.size-row{margin-left:92px;margin-top:6px}
+.size-row button{width:auto;margin-left:6px}
 </style>
 </head>
 
 <body>
 
 <header>
-  <b>Inventory</b>
-  <button onclick="logout()">Logout</button>
+  <b>Inventory</b>
+  <button onclick="logout()">Logout</button>
 </header>
 
 <!-- LOGIN -->
 <div class="container" id="loginBox">
-  <div class="card">
-    <h3>Login</h3>
-    <input id="email" placeholder="Email">
-    <input id="password" type="password" placeholder="Password">
-    <button onclick="login()">Login</button>
-  </div>
+  <div class="card">
+    <h3>Login</h3>
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+  </div>
 </div>
 
 <!-- APP -->
 <div class="container hidden" id="appBox">
-  <input id="search" placeholder="Search..." oninput="loadProducts()">
-  <button onclick="showAdd()">➕ Add Product</button>
-  <div id="products"></div>
+  <input id="search" placeholder="Search..." oninput="loadProducts()">
+  <button onclick="showAdd()">➕ Add Product</button>
+  <div id="products"></div>
 </div>
 
 <!-- ADD PRODUCT -->
 <div class="container hidden" id="addBox">
-  <div class="card">
-    <h3>Add Product</h3>
-    <input id="pname" placeholder="Name">
-    <input id="pcode" placeholder="Code">
-    <input id="pcolor" placeholder="Color">
-    <input id="psize" placeholder="Size">
-    <input id="pprice" type="number" placeholder="Price">
-    <input id="pstock" type="number" placeholder="Stock">
-    <input type="file" id="pimage" accept="image/*" capture="environment">
-    <button onclick="addProduct()">Save</button>
-    <button class="secondary" onclick="hideAdd()">Cancel</button>
-  </div>
+  <div class="card">
+    <h3>Add Product</h3>
+
+    <input id="pname" placeholder="Name">
+    <input id="pcode" placeholder="Code">
+
+    <label>Color</label>
+    <input type="color" id="pcolor" value="#000000">
+
+    <label>Size</label>
+    <select id="psize">
+      <option value="">Select Size</option>
+      <option value="7 Feet">7 Feet</option>
+      <option value="9 Feet">9 Feet</option>
+    </select>
+
+    <input id="pprice" type="number" placeholder="Price">
+    <input id="pstock" type="number" placeholder="Stock">
+
+    <input type="file" id="pimage" accept="image/*" capture="environment">
+
+    <button onclick="addProduct()">Save</button>
+    <button class="secondary" onclick="hideAdd()">Cancel</button>
+  </div>
 </div>
 
 <script>
-// 🔐 Firebase config
+// 🔐 Firebase
 firebase.initializeApp({
-  apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
-  authDomain: "inventory-app-9f7a3.firebaseapp.com",
-  projectId: "inventory-app-9f7a3"
+  apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
+  authDomain: "inventory-app-9f7a3.firebaseapp.com",
+  projectId: "inventory-app-9f7a3"
 });
 
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// ☁️ Cloudinary
-const CLOUD_NAME = "dahxnopuw";
-const UPLOAD_PRESET = "inventory_unsigned";
-
 // 🔐 Auth
 auth.onAuthStateChanged(u=>{
-  loginBox.classList.toggle("hidden", !!u);
-  appBox.classList.toggle("hidden", !u);
-  if(u) loadProducts();
+  loginBox.classList.toggle("hidden", !!u);
+  appBox.classList.toggle("hidden", !u);
+  if(u) loadProducts();
 });
 
 window.login = function(){
   auth.signInWithEmailAndPassword(email.value,password.value)
     .catch(e=>alert(e.message));
-}
+};
 
 window.logout = function(){
   auth.signOut();
-}
-
+};
 
 // 📷 Image compression
 function compressImage(file){
-  return new Promise(resolve=>{
-    const img=new Image();
-    img.onload=()=>{
-      const c=document.createElement("canvas");
-      const max=800;
-      let w=img.width,h=img.height;
-      if(w>h && w>max){h*=max/w;w=max}
-      else if(h>max){w*=max/h;h=max}
-      c.width=w;c.height=h;
-      c.getContext("2d").drawImage(img,0,0,w,h);
-      c.toBlob(b=>resolve(b),"image/jpeg",0.7);
-    };
-    img.src=URL.createObjectURL(file);
-  });
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement("canvas");
+      const max=800;
+      let w=img.width,h=img.height;
+      if(w>h && w>max){h*=max/w;w=max}
+      else if(h>max){w*=max/h;h=max}
+      c.width=w;c.height=h;
+      c.getContext("2d").drawImage(img,0,0,w,h);
+      c.toBlob(b=>resolve(b),"image/jpeg",0.7);
+    };
+    img.src=URL.createObjectURL(file);
+  });
 }
 
-// ☁️ Upload to Cloudinary
-async function uploadToCloudinary(file){
-  const blob=await compressImage(file);
-  const fd=new FormData();
-  fd.append("file",blob);
-  fd.append("upload_preset",UPLOAD_PRESET);
+// ☁️ Cloudinary
+const CLOUD_NAME="dahxnopuw";
+const UPLOAD_PRESET="inventory_unsigned";
 
-  const res=await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-    {method:"POST",body:fd}
-  );
-  const data=await res.json();
-  return data.secure_url;
+async function uploadToCloudinary(file){
+  const blob=await compressImage(file);
+  const fd=new FormData();
+  fd.append("file",blob);
+  fd.append("upload_preset",UPLOAD_PRESET);
+
+  const res=await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+    {method:"POST",body:fd});
+  return (await res.json()).secure_url;
 }
 
 // ➕ Add product
-window.addProduct() = async function(){
-  if(!pimage.files[0]) return alert("Image required");
-  const imageUrl=await uploadToCloudinary(pimage.files[0]);
+window.addProduct = async function(){
+  if(!pimage.files[0]) return alert("Image required");
 
-  await db.collection("inventory").add({
-    name:pname.value,
-    code:pcode.value,
-    color:pcolor.value,
-    size:psize.value,
-    price:+pprice.value,
-    stock:+pstock.value,
-    image:imageUrl,
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  });
+  const imageUrl = await uploadToCloudinary(pimage.files[0]);
 
-  hideAdd();
-  loadProducts();
-}
-
-// 📦 Load products
-async function loadProducts(){
-  products.innerHTML = "";
-  const q = search.value.toLowerCase();
-
-  const snap = await db.collection("inventory").get();
-  const grouped = {};
-
-  // 1️⃣ GROUP DATA
-  snap.forEach(doc => {
-    const p = doc.data();
-    const text = `${p.name} ${p.code} ${p.color} ${p.size}`.toLowerCase();
-    if (q && !text.includes(q)) return;
-
-    grouped[p.code] ??= {};
-    grouped[p.code][p.color] ??= {
-      image: p.image,
-      name: p.name,
-      sizes: []
-    };
-
-    grouped[p.code][p.color].sizes.push({
-      id: doc.id,
-      size: p.size,
-      stock: p.stock,
-      price: p.price
-    });
+  await db.collection("inventory").add({
+    name:pname.value,
+    code:pcode.value,
+    color:pcolor.value,
+    size:psize.value,
+    price:+pprice.value,
+    stock:+pstock.value,
+    image:imageUrl,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
   });
 
-  if (Object.keys(grouped).length === 0) {
-    products.innerHTML = `<div class="card">No products found</div>`;
-    return;
-  }
-
-  // 2️⃣ RENDER UI
-  Object.keys(grouped).forEach(code => {
-    const codeCard = document.createElement("div");
-    codeCard.className = "card";
-    codeCard.innerHTML = `<div class="group-title">Product Code: ${code}</div>`;
-
-    Object.keys(grouped[code]).forEach(color => {
-      const c = grouped[code][color];
-
-      const colorBlock = document.createElement("div");
-      colorBlock.className = "product sub";
-      colorBlock.innerHTML = `
-        <img src="${c.image}">
-        <div>
-          <b>${c.name}</b><br>
-          Color: <b>${color}</b>
-        </div>
-      `;
-
-      const sizeList = document.createElement("div");
-      sizeList.className = "sub";
-
-      c.sizes.forEach(s => {
-        const row = document.createElement("div");
-        row.innerHTML = `
-          Size: <b>${s.size}</b> |
-          ₹${s.price} |
-          <span class="${s.stock < 5 ? 'low' : ''}">
-            Stock: ${s.stock}
-          </span>
-
-<button type="button" onclick="updateStock('${s.id}',1)"></button>
-<button type="button" onclick="updateStock('${s.id}',-1)">OUT</button>
-
-
-
-          
-        `;
-        sizeList.appendChild(row);
-      });
-
-      codeCard.appendChild(colorBlock);
-      codeCard.appendChild(sizeList);
-    });
-
-    products.appendChild(codeCard);
-  });
-}
-
-
-
-window.updateStock = async function(id, delta){
-  console.log("Stock click:", id, delta);
-
-  const ref = db.collection("inventory").doc(id);
-  const snap = await ref.get();
-
-  if (!snap.exists) {
-    alert("Document not found");
-    return;
-  }
-
-  const newStock = (snap.data().stock || 0) + delta;
-  await ref.update({ stock: newStock });
-
+  hideAdd();
   loadProducts();
 };
 
+// 📦 Load products (GROUPED)
+async function loadProducts(){
+  products.innerHTML="";
+  const q = search.value.toLowerCase();
+  const snap = await db.collection("inventory").get();
 
+  const grouped = {};
 
-window.showAdd = function(){ addBox.classList.remove("hidden"); }
-window.hideAdd = function(){ addBox.classList.add("hidden"); }
+  snap.forEach(doc=>{
+    const p=doc.data();
+    const text=`${p.name} ${p.code} ${p.color} ${p.size}`.toLowerCase();
+    if(q && !text.includes(q)) return;
+
+    grouped[p.code] ??= {};
+    grouped[p.code][p.color] ??= {image:p.image,name:p.name,sizes:[]};
+
+    grouped[p.code][p.color].sizes.push({
+      id:doc.id,size:p.size,price:p.price,stock:p.stock
+    });
+  });
+
+  Object.keys(grouped).forEach(code=>{
+    const card=document.createElement("div");
+    card.className="card";
+    card.innerHTML=`<b>Product Code:</b> ${code}`;
+
+    Object.keys(grouped[code]).forEach(color=>{
+      const c=grouped[code][color];
+
+      card.innerHTML+=`
+        <div class="product">
+          <img src="${c.image}">
+          <div>
+            <b>${c.name}</b><br>
+            Color: <span style="background:${color};padding:2px 8px;border-radius:6px;color:#fff">${color}</span>
+          </div>
+        </div>
+      `;
+
+      c.sizes.forEach(s=>{
+        card.innerHTML+=`
+          <div class="size-row">
+            Size: <b>${s.size}</b> |
+            ₹${s.price} |
+            <span class="${s.stock<5?'low':''}">Stock: ${s.stock}</span>
+            <button type="button" onclick="updateStock('${s.id}',1)">IN</button>
+            <button type="button" onclick="updateStock('${s.id}',-1)">OUT</button>
+          </div>
+        `;
+      });
+    });
+
+    products.appendChild(card);
+  });
+
+  if(!products.innerHTML){
+    products.innerHTML=`<div class="card">No products found</div>`;
+  }
+}
+
+// 🔄 Stock update
+window.updateStock = async function(id,delta){
+  const ref=db.collection("inventory").doc(id);
+  const snap=await ref.get();
+  await ref.update({stock:(snap.data().stock||0)+delta});
+  loadProducts();
+};
+
+window.showAdd=()=>addBox.classList.remove("hidden");
+window.hideAdd=()=>addBox.classList.add("hidden");
 </script>
 
 </body>
 </html>
-
-
-
-
-
