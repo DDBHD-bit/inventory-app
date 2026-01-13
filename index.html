@@ -135,7 +135,7 @@ async function uploadToCloudinary(file){
 }
 
 // ➕ Add product
-async function addProduct(){
+window.addProduct() = async function(){
   if(!pimage.files[0]) return alert("Image required");
   const imageUrl=await uploadToCloudinary(pimage.files[0]);
 
@@ -219,7 +219,7 @@ async function loadProducts(){
             Stock: ${s.stock}
           </span>
 
-<button type="button" onclick="updateStock('${s.id}',1)">IN</button>
+<button type="button" onclick="updateStock('${s.id}',1)"></button>
 <button type="button" onclick="updateStock('${s.id}',-1)">OUT</button>
 
 
@@ -239,34 +239,32 @@ async function loadProducts(){
 
 
 
-window.updateStock = async function(id, delta) {
-  try {
-    const ref = db.collection("inventory").doc(id);
-    const snap = await ref.get();
+window.updateStock = async function(id, delta){
+  console.log("Stock click:", id, delta);
 
-    if (!snap.exists) {
-      alert("Item not found");
-      return;
-    }
+  const ref = db.collection("inventory").doc(id);
+  const snap = await ref.get();
 
-    const newStock = (snap.data().stock || 0) + delta;
-    if (newStock < 0) return alert("Stock cannot be negative");
-
-    await ref.update({ stock: newStock });
-    loadProducts();
-  } catch (e) {
-    alert(e.message);
-    console.error(e);
+  if (!snap.exists) {
+    alert("Document not found");
+    return;
   }
+
+  const newStock = (snap.data().stock || 0) + delta;
+  await ref.update({ stock: newStock });
+
+  loadProducts();
 };
 
 
-function showAdd(){ addBox.classList.remove("hidden"); }
-function hideAdd(){ addBox.classList.add("hidden"); }
+
+window.showAdd = function(){ addBox.classList.remove("hidden"); }
+window.hideAdd = function(){ addBox.classList.add("hidden"); }
 </script>
 
 </body>
 </html>
+
 
 
 
