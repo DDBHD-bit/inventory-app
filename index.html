@@ -139,26 +139,7 @@ async function uploadToCloudinary(file){
   return (await res.json()).secure_url;
 }
 
-// ➕ Add product
-window.addProduct = async function(){
-  if(!pimage.files[0]) return alert("Image required");
 
-  const imageUrl = await uploadToCloudinary(pimage.files[0]);
-
-  await db.collection("inventory").add({
-    name:pname.value,
-    code:pcode.value,
-    color:pcolor.value,
-    size:psize.value,
-    price:+pprice.value,
-    stock:+pstock.value,
-    image:imageUrl,
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  });
-
-  hideAdd();
-  loadProducts();
-};
 
 // 📦 Load products (GROUPED)
 async function loadProducts(){
@@ -220,6 +201,42 @@ async function loadProducts(){
   }
 }
 
+<script>
+/* ---------- GLOBAL UI FUNCTIONS ---------- */
+
+function showAdd(){
+  document.getElementById("addBox").classList.remove("hidden");
+}
+
+function hideAdd(){
+  document.getElementById("addBox").classList.add("hidden");
+}
+
+/* ---------- ADD PRODUCT ---------- */
+async function addProduct(){
+  if(!pimage.files[0]){
+    alert("Image required");
+    return;
+  }
+
+  const imageUrl = await uploadToCloudinary(pimage.files[0]);
+
+  await db.collection("inventory").add({
+    name: pname.value,
+    code: pcode.value,
+    color: pcolor.value,
+    size: psize.value,
+    price: Number(pprice.value),
+    stock: Number(pstock.value),
+    image: imageUrl,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  hideAdd();
+  loadProducts();
+}
+</script>
+
 // 🔄 Stock update
 window.updateStock = async function(id,delta){
   const ref=db.collection("inventory").doc(id);
@@ -228,8 +245,6 @@ window.updateStock = async function(id,delta){
   loadProducts();
 };
 
-window.showAdd=()=>addBox.classList.remove("hidden");
-window.hideAdd=()=>addBox.classList.add("hidden");
 </script>
 
 </body>
