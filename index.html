@@ -24,6 +24,12 @@ button.secondary{background:#64748b}
 .low{color:#dc2626;font-weight:bold}
 .size-row{margin-left:92px;margin-top:6px}
 .size-row button{width:auto;margin-left:6px}
+.color-badge{
+  padding:2px 10px;
+  border-radius:6px;
+  color:#fff;
+  font-size:13px;
+}
 </style>
 </head>
 
@@ -60,7 +66,17 @@ button.secondary{background:#64748b}
     <input id="pcode" placeholder="Code">
 
     <label>Color</label>
-    <input type="color" id="pcolor" value="#000000">
+    <select id="pcolor">
+      <option value="">Select Color</option>
+      <option value="Red">Red</option>
+      <option value="Blue">Blue</option>
+      <option value="Green">Green</option>
+      <option value="Black">Black</option>
+      <option value="White">White</option>
+      <option value="Yellow">Yellow</option>
+      <option value="Brown">Brown</option>
+      <option value="Grey">Grey</option>
+    </select>
 
     <label>Size</label>
     <select id="psize">
@@ -94,10 +110,7 @@ function login(){
   auth.signInWithEmailAndPassword(email.value,password.value)
     .catch(e=>alert(e.message));
 }
-
-function logout(){
-  auth.signOut();
-}
+function logout(){ auth.signOut(); }
 
 auth.onAuthStateChanged(u=>{
   loginBox.classList.toggle("hidden",!!u);
@@ -109,7 +122,7 @@ auth.onAuthStateChanged(u=>{
 function showAdd(){ addBox.classList.remove("hidden"); }
 function hideAdd(){ addBox.classList.add("hidden"); }
 
-/* ================= IMAGE UPLOAD ================= */
+/* ================= IMAGE ================= */
 function compressImage(file){
   return new Promise(resolve=>{
     const img=new Image();
@@ -135,13 +148,15 @@ async function uploadToCloudinary(file){
   const fd=new FormData();
   fd.append("file",blob);
   fd.append("upload_preset",UPLOAD_PRESET);
-  const r=await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,{method:"POST",body:fd});
+  const r=await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+    {method:"POST",body:fd});
   return (await r.json()).secure_url;
 }
 
 /* ================= ADD PRODUCT ================= */
 async function addProduct(){
   if(!pimage.files[0]) return alert("Image required");
+  if(!pcolor.value) return alert("Select color");
 
   const image=await uploadToCloudinary(pimage.files[0]);
 
@@ -160,7 +175,7 @@ async function addProduct(){
   loadProducts();
 }
 
-/* ================= LOAD PRODUCTS (GROUPED) ================= */
+/* ================= LOAD PRODUCTS ================= */
 async function loadProducts(){
   products.innerHTML="";
   const q=search.value.toLowerCase();
@@ -189,13 +204,14 @@ async function loadProducts(){
 
     Object.keys(grouped[code]).forEach(color=>{
       const c=grouped[code][color];
+
       card.innerHTML+=`
         <div class="product">
           <img src="${c.image}">
           <div>
             <b>${c.name}</b><br>
             Color:
-            <span style="background:${color};color:#fff;padding:2px 8px;border-radius:6px">
+            <span class="color-badge" style="background:${color.toLowerCase()}">
               ${color}
             </span>
           </div>
@@ -219,7 +235,7 @@ async function loadProducts(){
   });
 }
 
-/* ================= STOCK UPDATE ================= */
+/* ================= STOCK ================= */
 async function updateStock(id,delta){
   const ref=db.collection("inventory").doc(id);
   const snap=await ref.get();
