@@ -136,11 +136,15 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 /* ================= AUTH ================= */
-function login(){
-  auth.signInWithEmailAndPassword(email.value,password.value)
-    .catch(e=>alert(e.message));
-}
-function logout(){ auth.signOut(); }
+window.login = function(){
+  auth.signInWithEmailAndPassword(email.value, password.value)
+    .catch(e => alert(e.message));
+};
+
+window.logout = function(){
+  auth.signOut();
+};
+
 
 auth.onAuthStateChanged(u=>{
   loginBox.classList.toggle("hidden",!!u);
@@ -149,8 +153,14 @@ auth.onAuthStateChanged(u=>{
 });
 
 /* ================= UI ================= */
-function showAdd(){ addBox.classList.remove("hidden"); }
-function hideAdd(){ addBox.classList.add("hidden"); }
+window.showAdd = function(){
+  addBox.classList.remove("hidden");
+};
+
+window.hideAdd = function(){
+  addBox.classList.add("hidden");
+};
+
 
 /* ================= IMAGE ================= */
 function compressImage(file){
@@ -395,6 +405,7 @@ window.closeSummary = function(){
 
 </body>
 </html>
+
 
 
 
