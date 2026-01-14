@@ -142,11 +142,10 @@ const db = firebase.firestore();
 
 /* ================= AUTH ================= */
 window.login = function () {
-  const emailEl = document.getElementById("email");
-  const passwordEl = document.getElementById("password");
-
-  auth.signInWithEmailAndPassword(emailEl.value, passwordEl.value)
-    .catch(err => alert(err.message));
+  auth.signInWithEmailAndPassword(
+    email.value,
+    password.value
+  ).catch(e => alert(e.message));
 };
 
 window.logout = function () {
@@ -278,20 +277,21 @@ async function loadProducts(){
           </div>
         </div>
       `;
-       const totalStock = calculateStock(s.bins);
-      c.sizes.forEach(s=>{
-        card.innerHTML+=`
-          <div class="size-row">
-            Size <b>${s.size}</b> |
-            ₹${s.price} |
-           
-            <span class="${totalStock<5?'low':''}">  Total Stock: ${totalStock}</span>
+c.sizes.forEach(s => {
+  const totalStock = calculateStock(s.bins);
 
-              <button onclick="updateStock('${s.id}','IN')">IN</button>
-            <button onclick="updateStock('${s.id}','OUT')">OUT</button>
-          </div>
-        `;
-      });
+  card.innerHTML += `
+    <div class="size-row">
+      Size <b>${s.size}</b> |
+      ₹${s.price} |
+      <span class="${totalStock < 5 ? 'low' : ''}">
+        Total Stock: ${totalStock}
+      </span>
+      <button onclick="updateStock('${s.id}','IN')">IN</button>
+      <button onclick="updateStock('${s.id}','OUT')">OUT</button>
+    </div>
+  `;
+});
     });
 
     products.appendChild(card);
@@ -414,6 +414,7 @@ window.closeSummary = function(){
 
 </body>
 </html>
+
 
 
 
