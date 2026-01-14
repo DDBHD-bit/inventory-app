@@ -200,7 +200,6 @@ async function addProduct(){
     color:pcolor.value,
     size:psize.value,
     price:Number(pprice.value),
-    stock:Number(pstock.value),
     image: imageUrl,
     bins: bins,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
@@ -210,7 +209,6 @@ await db.collection("audit_logs").add({
   code: pcode.value,
   color: pcolor.value,
   size: psize.value,
-  change: Number(pstock.value),
   type: "ADD",
   user: auth.currentUser.email,
   timestamp: firebase.firestore.FieldValue.serverTimestamp()
@@ -261,18 +259,17 @@ async function loadProducts(){
           </div>
         </div>
       `;
-
+       const totalStock = calculateStock(s.bins);
       c.sizes.forEach(s=>{
         card.innerHTML+=`
           <div class="size-row">
             Size <b>${s.size}</b> |
             ₹${s.price} |
-            const totalStock = calculateStock(s.bins);
+           
             <span class="${totalStock<5?'low':''}">  Total Stock: ${totalStock}</span>
 
-
-            <button type="button" onclick="stockPrompt('${s.id}','IN')">IN</button>
-            <button type="button" onclick="stockPrompt('${s.id}','OUT')">OUT</button>
+              <button onclick="updateStock('${s.id}','IN')">IN</button>
+            <button onclick="updateStock('${s.id}','OUT')">OUT</button>
           </div>
         `;
       });
@@ -317,10 +314,10 @@ window.updateStock = async function(id, type){
   await db.collection("audit_logs").add({
     productId: id,
     code: data.code,
-    action: type,
-    qty,
+    type: type,
+    change: qty,
     bin,
-    at: firebase.firestore.FieldValue.serverTimestamp(),
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
     user: auth.currentUser.email
   });
 
@@ -355,57 +352,11 @@ window.stockPrompt = async function(id, type){
 
   if(type === "OUT") qty = -qty;
 
-  await window.updateStock(id, qty);
+  await window.updateStock(id, type)
 };
 
 /* ================= UPDATE STOCK (GLOBAL) ================= */
 
-window.updateStock = async function(id, delta){
-  console.log("Updating stock:", id, delta); // DEBUG
-
-  const ref = db.collection("inventory").doc(id);
-  const snap = await ref.get();
-
-  if(!snap.exists){
-    alert("Product not found");
-    return;
-  }
-
-  const current = Number(snap.data().stock || 0);
-  const updated = current + delta;
-
-  if(updated < 0){
-    alert("Stock cannot be negative");
-    return;
-  }
-
-  await ref.update({ stock: updated });
-  loadProducts();
-};
-window.openAudit = async function(){
-  auditBox.classList.remove("hidden");
-  auditList.innerHTML = "Loading...";
-
-  const snap = await db.collection("audit_logs")
-    .orderBy("timestamp","desc")
-    .limit(50)
-    .get();
-
-  auditList.innerHTML = "";
-
-  snap.forEach(d=>{
-    const a = d.data();
-    auditList.innerHTML += `
-      <div class="card">
-        <b>${a.type}</b> | ${a.code}<br>
-        ${a.color} | ${a.size}<br>
-        Qty: ${a.change}<br>
-        By: ${a.user}<br>
-        <small>${a.timestamp?.toDate().toLocaleString()}</small>
-      </div>
-    `;
-  });
-};
 
 window.closeAudit = function(){
   auditBox.classList.add("hidden");
@@ -444,6 +395,7 @@ window.closeSummary = function(){
 
 </body>
 </html>
+
 
 
 
