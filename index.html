@@ -95,7 +95,9 @@ button.secondary{background:#64748b}
     </select>
 
     <input id="pprice" type="number" placeholder="Price">
-    <input id="pstock" type="number" placeholder="Stock">
+    <input id="pbin" placeholder="BIN Location (e.g. A1)">
+<input id="pbinqty" type="number" placeholder="Quantity in this BIN">
+<small>You can add more bins later</small>
     <input type="file" id="pimage" accept="image/*">
 
     <button onclick="addProduct()">Save</button>
@@ -185,9 +187,13 @@ async function uploadToCloudinary(file){
 async function addProduct(){
   if(!pimage.files[0]) return alert("Image required");
   if(!pcolor.value) return alert("Select color");
+  if(!pbin.value || !pbinqty.value){alert("BIN and Quantity required");
+    return;
+  }
 
-  const image=await uploadToCloudinary(pimage.files[0]);
-
+  const imageUrl = await uploadToCloudinary(pimage.files[0]);
+  const bins = {};
+  bins[pbin.value.trim()] = Number(pbinqty.value);
   await db.collection("inventory").add({
     name:pname.value,
     code:pcode.value,
@@ -195,7 +201,8 @@ async function addProduct(){
     size:psize.value,
     price:Number(pprice.value),
     stock:Number(pstock.value),
-    image,
+    image: imageUrl,
+    bins: bins,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   });
 await db.collection("audit_logs").add({
@@ -260,7 +267,10 @@ async function loadProducts(){
           <div class="size-row">
             Size <b>${s.size}</b> |
             ₹${s.price} |
-            <span class="${s.stock<5?'low':''}">Stock ${s.stock}</span>
+            const totalStock = calculateStock(s.bins);
+            <span class="${totalStock<5?'low':''}">  Total Stock: ${totalStock}</span>
+
+
             <button type="button" onclick="stockPrompt('${s.id}','IN')">IN</button>
             <button type="button" onclick="stockPrompt('${s.id}','OUT')">OUT</button>
           </div>
@@ -274,56 +284,53 @@ async function loadProducts(){
 
 /* ================= STOCK ================= */
 
-window.updateStock = async function(id, delta){
-  try {
-    const user = auth.currentUser;
-    if (!user) {
-      alert("User not authenticated");
-      return;
-    }
+window.updateStock = async function(id, type){
+  const qty = Number(prompt("Enter quantity"));
+  if(!qty || qty <= 0) return;
 
-    const ref = db.collection("inventory").doc(id);
-    const snap = await ref.get();
+  const bin = prompt("Enter BIN location (e.g. A1)");
+  if(!bin) return;
 
-    if (!snap.exists) {
-      alert("Product not found");
-      return;
-    }
+  const ref = db.collection("inventory").doc(id);
+  const snap = await ref.get();
+  if(!snap.exists) return;
 
-    const p = snap.data();
-    const currentStock = Number(p.stock || 0);
-    const newStock = currentStock + delta;
+  const data = snap.data();
+  const bins = data.bins || {};
 
-    if (newStock < 0) {
-      alert("Stock cannot be negative");
-      return;
-    }
+  const current = bins[bin] || 0;
 
-    // 1️⃣ Update stock
-    await ref.update({ stock: newStock });
-
-    // 2️⃣ Save audit log
-    await db.collection("audit_logs").add({
-      productId: id,
-      code: p.code || "",
-      color: p.color || "",
-      size: p.size || "",
-      change: Math.abs(delta),
-      type: delta > 0 ? "IN" : "OUT",
-      user: user.email,
-      timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    });
-
-    console.log("Audit log saved successfully");
-    loadProducts();
-
-  } catch (err) {
-    console.error("Audit log error:", err);
-    alert("Failed to save audit log. Check console.");
+  if(type === "OUT" && current < qty){
+    alert("Not enough stock in this BIN");
+    return;
   }
+
+  bins[bin] = type === "IN"
+    ? current + qty
+    : current - qty;
+
+  if(bins[bin] === 0) delete bins[bin];
+
+  await ref.update({ bins });
+
+  // 🔍 Audit log
+  await db.collection("audit_logs").add({
+    productId: id,
+    code: data.code,
+    action: type,
+    qty,
+    bin,
+    at: firebase.firestore.FieldValue.serverTimestamp(),
+    user: auth.currentUser.email
+  });
+
+  loadProducts();
 };
 
 
+function calculateStock(bins){
+  return Object.values(bins || {}).reduce((a,b)=>a+b,0);
+}
 
 
 /* ================= STOCK PROMPT (GLOBAL) ================= */
@@ -437,6 +444,7 @@ window.closeSummary = function(){
 
 </body>
 </html>
+
 
 
 
