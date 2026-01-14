@@ -46,7 +46,7 @@ button.secondary{background:#64748b}
     <h3>Login</h3>
     <input id="email" placeholder="Email">
     <input id="password" type="password" placeholder="Password">
-    <button onclick="login()">Login</button>
+    <button id="loginBtn">Login</button>
   </div>
 </div>
 
@@ -104,12 +104,17 @@ firebase.initializeApp({
 
 const auth = firebase.auth();
 const db = firebase.firestore();
+  
+document.getElementById("loginBtn").addEventListener("click", () => {
+  const emailVal = document.getElementById("email").value;
+  const passVal  = document.getElementById("password").value;
+
+  auth.signInWithEmailAndPassword(emailVal, passVal)
+    .catch(err => alert(err.message));
+});
 
 /* ================= AUTH ================= */
-window.login = function(){
-  auth.signInWithEmailAndPassword(email.value,password.value)
-    .catch(e=>alert(e.message));
-};
+
 
 window.logout = function(){
   auth.signOut();
@@ -279,3 +284,4 @@ window.updateStock = async function(id,type){
 
 </body>
 </html>
+
