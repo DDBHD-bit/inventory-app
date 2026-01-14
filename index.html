@@ -25,10 +25,10 @@ button.secondary{background:#64748b}
 .size-row{margin-left:92px;margin-top:6px}
 .size-row button{width:auto;margin-left:6px}
 .color-badge{
-  padding:2px 10px;
-  border-radius:6px;
-  color:#fff;
-  font-size:13px;
+  padding:2px 10px;
+  border-radius:6px;
+  color:#fff;
+  font-size:13px;
 }
 </style>
 </head>
@@ -36,393 +36,269 @@ button.secondary{background:#64748b}
 <body>
 
 <header>
-  <b>Inventory</b>
-  <button onclick="openAudit()">Audit</button>
-  <button onclick="openSummary()">Daily Summary</button>  
-  <button onclick="logout()">Logout</button>
+  <b>Inventory</b>
+  <button onclick="logout()">Logout</button>
 </header>
 
 <!-- LOGIN -->
 <div class="container" id="loginBox">
-  <div class="card">
-    <h3>Login</h3>
-    <input id="email" placeholder="Email">
-    <input id="password" type="password" placeholder="Password">
-    <button onclick="login()">Login</button>
-  </div>
+  <div class="card">
+    <h3>Login</h3>
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+  </div>
 </div>
 
 <!-- APP -->
 <div class="container hidden" id="appBox">
-  <input id="search" placeholder="Search..." oninput="loadProducts()">
-  <button onclick="showAdd()">➕ Add Product</button>
-  <div id="products"></div>
+  <input id="search" placeholder="Search..." oninput="loadProducts()">
+  <button onclick="showAdd()">➕ Add Product</button>
+  <div id="products"></div>
 </div>
 
 <!-- ADD PRODUCT -->
 <div class="container hidden" id="addBox">
-  <div class="card">
-    <h3>Add Product</h3>
-    <input id="pcode" placeholder="Code">
-    <input id="pname" placeholder="Name">
+  <div class="card">
+    <h3>Add Product</h3>
+    <input id="pcode" placeholder="Code">
+    <input id="pname" placeholder="Name">
 
 
-    <label>Color</label>
-    <select id="pcolor">
-      <option value="">Select Color</option>
-      <option value="Red">Red</option>
-      <option value="Blue">Blue</option>
-      <option value="Green">Green</option>
-      <option value="Black">Black</option>
-      <option value="White">White</option>
-      <option value="Yellow">Yellow</option>
-      <option value="Brown">Brown</option>
-      <option value="Grey">Grey</option>
-      <option value="Pink">Pink</option>
-      <option value="Biege">Biege</option>
-      <option value="Light Biege">Light Biege</option>
-      <option value="Cream">Cream</option>
-      <option value="Sea Green">Sea Green</option>
-      <option value="Rani">Rani</option>
-      
-    </select>
+    <label>Color</label>
+    <select id="pcolor">
+      <option value="">Select Color</option>
+      <option value="Red">Red</option>
+      <option value="Blue">Blue</option>
+      <option value="Green">Green</option>
+      <option value="Black">Black</option>
+      <option value="White">White</option>
+      <option value="Yellow">Yellow</option>
+      <option value="Brown">Brown</option>
+      <option value="Grey">Grey</option>
+    </select>
 
-    <label>Size</label>
-    <select id="psize">
-      <option value="">Select Size</option>
-      <option value="7 Feet">7 Feet</option>
-      <option value="9 Feet">9 Feet</option>
-    </select>
+    <label>Size</label>
+    <select id="psize">
+      <option value="">Select Size</option>
+      <option value="7 Feet">7 Feet</option>
+      <option value="9 Feet">9 Feet</option>
+    </select>
 
-    <input id="pprice" type="number" placeholder="Price">
-    <input id="pbin" placeholder="BIN Location (e.g. A1)">
-<input id="pbinqty" type="number" placeholder="Quantity in this BIN">
-<small>You can add more bins later</small>
-    <input type="file" id="pimage" accept="image/*">
+    <input id="pprice" type="number" placeholder="Price">
+    <input id="pstock" type="number" placeholder="Stock">
+    <input type="file" id="pimage" accept="image/*">
 
-    <button onclick="addProduct()">Save</button>
-    <button class="secondary" onclick="hideAdd()">Cancel</button>
-  </div>
-</div>
-<!-- AUDIT LOG MODAL -->
-<div class="container hidden" id="auditBox">
-  <div class="card">
-    <h3>Audit Logs</h3>
-    <div id="auditList"></div>
-    <button class="secondary" onclick="closeAudit()">Close</button>
-  </div>
+    <button onclick="addProduct()">Save</button>
+    <button class="secondary" onclick="hideAdd()">Cancel</button>
+  </div>
 </div>
 
-<!-- DAILY SUMMARY MODAL -->
-<div class="container hidden" id="summaryBox">
-  <div class="card">
-    <h3>Today's Stock Movement</h3>
-    <div id="summaryList"></div>
-    <button class="secondary" onclick="closeSummary()">Close</button>
-  </div>
-</div>
-
-
-  
 <script>
-window.login = null;
-window.logout = null;
-window.showAdd = null;
-window.hideAdd = null;
-  
 /* ================= FIREBASE ================= */
 firebase.initializeApp({
-  apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
-  authDomain: "inventory-app-9f7a3.firebaseapp.com",
-  projectId: "inventory-app-9f7a3"
+  apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
+  authDomain: "inventory-app-9f7a3.firebaseapp.com",
+  projectId: "inventory-app-9f7a3"
 });
 
 const auth = firebase.auth();
 const db = firebase.firestore();
 
 /* ================= AUTH ================= */
-window.login = function () {
-  auth.signInWithEmailAndPassword(
-    email.value,
-    password.value
-  ).catch(e => alert(e.message));
-};
-
-window.logout = function () {
-  auth.signOut();
-};
-
-
+function login(){
+  auth.signInWithEmailAndPassword(email.value,password.value)
+    .catch(e=>alert(e.message));
+}
+function logout(){ auth.signOut(); }
 
 auth.onAuthStateChanged(u=>{
-  loginBox.classList.toggle("hidden",!!u);
-  appBox.classList.toggle("hidden",!u);
-  if(u) loadProducts();
+  loginBox.classList.toggle("hidden",!!u);
+  appBox.classList.toggle("hidden",!u);
+  if(u) loadProducts();
 });
 
 /* ================= UI ================= */
-window.showAdd = function(){
-  addBox.classList.remove("hidden");
-};
-
-window.hideAdd = function(){
-  addBox.classList.add("hidden");
-};
-
+function showAdd(){ addBox.classList.remove("hidden"); }
+function hideAdd(){ addBox.classList.add("hidden"); }
 
 /* ================= IMAGE ================= */
 function compressImage(file){
-  return new Promise(resolve=>{
-    const img=new Image();
-    img.onload=()=>{
-      const c=document.createElement("canvas");
-      const max=800;
-      let w=img.width,h=img.height;
-      if(w>h&&w>max){h*=max/w;w=max}
-      else if(h>max){w*=max/h;h=max}
-      c.width=w;c.height=h;
-      c.getContext("2d").drawImage(img,0,0,w,h);
-      c.toBlob(b=>resolve(b),"image/jpeg",0.7);
-    };
-    img.src=URL.createObjectURL(file);
-  });
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement("canvas");
+      const max=800;
+      let w=img.width,h=img.height;
+      if(w>h&&w>max){h*=max/w;w=max}
+      else if(h>max){w*=max/h;h=max}
+      c.width=w;c.height=h;
+      c.getContext("2d").drawImage(img,0,0,w,h);
+      c.toBlob(b=>resolve(b),"image/jpeg",0.7);
+    };
+    img.src=URL.createObjectURL(file);
+  });
 }
 
 const CLOUD_NAME="dahxnopuw";
 const UPLOAD_PRESET="inventory_unsigned";
 
 async function uploadToCloudinary(file){
-  const blob=await compressImage(file);
-  const fd=new FormData();
-  fd.append("file",blob);
-  fd.append("upload_preset",UPLOAD_PRESET);
-  const r=await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-    {method:"POST",body:fd});
-  return (await r.json()).secure_url;
+  const blob=await compressImage(file);
+  const fd=new FormData();
+  fd.append("file",blob);
+  fd.append("upload_preset",UPLOAD_PRESET);
+  const r=await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+    {method:"POST",body:fd});
+  return (await r.json()).secure_url;
 }
 
 /* ================= ADD PRODUCT ================= */
 async function addProduct(){
-  if(!pimage.files[0]) return alert("Image required");
-  if(!pcolor.value) return alert("Select color");
-  if(!pbin.value || !pbinqty.value){alert("BIN and Quantity required");
-    return;
-  }
+  if(!pimage.files[0]) return alert("Image required");
+  if(!pcolor.value) return alert("Select color");
 
-  const imageUrl = await uploadToCloudinary(pimage.files[0]);
-  const bins = {};
-  bins[pbin.value.trim()] = Number(pbinqty.value);
-  await db.collection("inventory").add({
-    name:pname.value,
-    code:pcode.value,
-    color:pcolor.value,
-    size:psize.value,
-    price:Number(pprice.value),
-    image: imageUrl,
-    bins: bins,
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  });
-await db.collection("audit_logs").add({
-  productId: "NEW",
-  code: pcode.value,
-  color: pcolor.value,
-  size: psize.value,
-  type: "ADD",
-  user: auth.currentUser.email,
-  timestamp: firebase.firestore.FieldValue.serverTimestamp()
-});
-  hideAdd();
-  loadProducts();
+  const image=await uploadToCloudinary(pimage.files[0]);
+
+  await db.collection("inventory").add({
+    name:pname.value,
+    code:pcode.value,
+    color:pcolor.value,
+    size:psize.value,
+    price:Number(pprice.value),
+    stock:Number(pstock.value),
+    image,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  });
+
+  hideAdd();
+  loadProducts();
 }
 
 /* ================= LOAD PRODUCTS ================= */
 async function loadProducts(){
-  products.innerHTML="";
-  const q=search.value.toLowerCase();
-  const snap=await db.collection("inventory").get();
-  const grouped={};
+  products.innerHTML="";
+  const q=search.value.toLowerCase();
+  const snap=await db.collection("inventory").get();
+  const grouped={};
 
-  snap.forEach(doc=>{
-    const p=doc.data();
-    const text=`${p.name} ${p.code} ${p.color} ${p.size}`.toLowerCase();
-    if(q && !text.includes(q)) return;
+  snap.forEach(doc=>{
+    const p=doc.data();
+    const text=`${p.name} ${p.code} ${p.color} ${p.size}`.toLowerCase();
+    if(q && !text.includes(q)) return;
 
-    grouped[p.code] ??= {};
-    grouped[p.code][p.color] ??= {image:p.image,name:p.name,sizes:[]};
-    grouped[p.code][p.color].sizes.push({id:doc.id,...p});
-  });
+    grouped[p.code] ??= {};
+    grouped[p.code][p.color] ??= {image:p.image,name:p.name,sizes:[]};
+    grouped[p.code][p.color].sizes.push({id:doc.id,...p});
+  });
 
-  if(Object.keys(grouped).length===0){
-    products.innerHTML='<div class="card">No products found</div>';
-    return;
-  }
+  if(Object.keys(grouped).length===0){
+    products.innerHTML='<div class="card">No products found</div>';
+    return;
+  }
 
-  Object.keys(grouped).forEach(code=>{
-    const card=document.createElement("div");
-    card.className="card";
-    card.innerHTML=`<b>Product Code:</b> ${code}`;
+  Object.keys(grouped).forEach(code=>{
+    const card=document.createElement("div");
+    card.className="card";
+    card.innerHTML=`<b>Product Code:</b> ${code}`;
 
-    Object.keys(grouped[code]).forEach(color=>{
-      const c=grouped[code][color];
+    Object.keys(grouped[code]).forEach(color=>{
+      const c=grouped[code][color];
 
-      card.innerHTML+=`
-        <div class="product">
-          <img src="${c.image}">
-          <div>
-            <b>${c.name}</b><br>
-            Color:
-            <span class="color-badge" style="background:${color.toLowerCase()}">
-              ${color}
-            </span>
-          </div>
-        </div>
-      `;
-c.sizes.forEach(s => {
-  const totalStock = calculateStock(s.bins);
+      card.innerHTML+=`
+        <div class="product">
+          <img src="${c.image}">
+          <div>
+            <b>${c.name}</b><br>
+            Color:
+            <span class="color-badge" style="background:${color.toLowerCase()}">
+              ${color}
+            </span>
+          </div>
+        </div>
+      `;
 
-  card.innerHTML += `
-    <div class="size-row">
-      Size <b>${s.size}</b> |
-      ₹${s.price} |
-      <span class="${totalStock < 5 ? 'low' : ''}">
-        Total Stock: ${totalStock}
-      </span>
-      <button onclick="updateStock('${s.id}','IN')">IN</button>
-      <button onclick="updateStock('${s.id}','OUT')">OUT</button>
-    </div>
-  `;
-});
-    });
+      c.sizes.forEach(s=>{
+        card.innerHTML+=`
+          <div class="size-row">
+            Size <b>${s.size}</b> |
+            ₹${s.price} |
+            <span class="${s.stock<5?'low':''}">Stock ${s.stock}</span>
+            <button type="button" onclick="stockPrompt('${s.id}','IN')">IN</button>
+            <button type="button" onclick="stockPrompt('${s.id}','OUT')">OUT</button>
+          </div>
+        `;
+      });
+    });
 
-    products.appendChild(card);
-  });
+    products.appendChild(card);
+  });
 }
 
 /* ================= STOCK ================= */
-
-window.updateStock = async function(id, type){
-  const qty = Number(prompt("Enter quantity"));
-  if(!qty || qty <= 0) return;
-
-  const bin = prompt("Enter BIN location (e.g. A1)");
-  if(!bin) return;
-
-  const ref = db.collection("inventory").doc(id);
-  const snap = await ref.get();
-  if(!snap.exists) return;
-
-  const data = snap.data();
-  const bins = data.bins || {};
-
-  const current = bins[bin] || 0;
-
-  if(type === "OUT" && current < qty){
-    alert("Not enough stock in this BIN");
-    return;
-  }
-
-  bins[bin] = type === "IN"
-    ? current + qty
-    : current - qty;
-
-  if(bins[bin] === 0) delete bins[bin];
-
-  await ref.update({ bins });
-
-  // 🔍 Audit log
-  await db.collection("audit_logs").add({
-    productId: id,
-    code: data.code,
-    type: type,
-    change: qty,
-    bin,
-    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    user: auth.currentUser.email
-  });
-
-  loadProducts();
-};
-
-
-function calculateStock(bins){
-  return Object.values(bins || {}).reduce((a,b)=>a+b,0);
+async function updateStock(id,delta){
+  const ref=db.collection("inventory").doc(id);
+  const snap=await ref.get();
+  await ref.update({stock:(snap.data().stock||0)+delta});
+  loadProducts();
 }
+
+
 
 
 /* ================= STOCK PROMPT (GLOBAL) ================= */
 
 window.stockPrompt = async function(id, type){
-  console.log("Button clicked:", id, type); // DEBUG (keep for now)
+  console.log("Button clicked:", id, type); // DEBUG (keep for now)
 
-  let qty = prompt(
-    type === "IN"
-      ? "Enter quantity to ADD"
-      : "Enter quantity to DEDUCT"
-  );
+  let qty = prompt(
+    type === "IN"
+      ? "Enter quantity to ADD"
+      : "Enter quantity to DEDUCT"
+  );
 
-  if(qty === null) return;
+  if(qty === null) return;
 
-  qty = Number(qty);
+  qty = Number(qty);
 
-  if(isNaN(qty) || qty <= 0){
-    alert("Enter a valid number");
-    return;
-  }
+  if(isNaN(qty) || qty <= 0){
+    alert("Enter a valid number");
+    return;
+  }
 
-  if(type === "OUT") qty = -qty;
+  if(type === "OUT") qty = -qty;
 
-  await window.updateStock(id, type)
+  await window.updateStock(id, qty);
 };
 
 /* ================= UPDATE STOCK (GLOBAL) ================= */
 
+window.updateStock = async function(id, delta){
+  console.log("Updating stock:", id, delta); // DEBUG
 
-window.closeAudit = function(){
-  auditBox.classList.add("hidden");
+  const ref = db.collection("inventory").doc(id);
+  const snap = await ref.get();
+
+  if(!snap.exists){
+    alert("Product not found");
+    return;
+  }
+
+  const current = Number(snap.data().stock || 0);
+  const updated = current + delta;
+
+  if(updated < 0){
+    alert("Stock cannot be negative");
+    return;
+  }
+
+  await ref.update({ stock: updated });
+  loadProducts();
 };
 
-window.openSummary = async function(){
-  summaryBox.classList.remove("hidden");
-  summaryList.innerHTML = "Loading...";
-
-  const start = new Date();
-  start.setHours(0,0,0,0);
-
-  const snap = await db.collection("audit_logs")
-    .where("timestamp", ">=", start)
-    .get();
-
-  let totalIn = 0, totalOut = 0;
-
-  snap.forEach(d=>{
-    const a = d.data();
-    if(a.type === "IN") totalIn += a.change;
-    if(a.type === "OUT") totalOut += a.change;
-  });
-
-  summaryList.innerHTML = `
-    <div class="card">Total Stock IN: <b>${totalIn}</b></div>
-    <div class="card">Total Stock OUT: <b>${totalOut}</b></div>
-  `;
-};
-
-window.closeSummary = function(){
-  summaryBox.classList.add("hidden");
-};  
-  
+ 
 </script>
 
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
 
