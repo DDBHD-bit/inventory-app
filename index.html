@@ -125,6 +125,11 @@ button.secondary{background:#64748b}
 
   
 <script>
+window.login = null;
+window.logout = null;
+window.showAdd = null;
+window.hideAdd = null;
+  
 /* ================= FIREBASE ================= */
 firebase.initializeApp({
   apiKey: "AIzaSyAMOEoWseBnscSrmpnZ2u9U7tgtuwWHeh4",
@@ -136,14 +141,18 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 /* ================= AUTH ================= */
-window.login = function(){
-  auth.signInWithEmailAndPassword(email.value, password.value)
-    .catch(e => alert(e.message));
+window.login = function () {
+  const emailEl = document.getElementById("email");
+  const passwordEl = document.getElementById("password");
+
+  auth.signInWithEmailAndPassword(emailEl.value, passwordEl.value)
+    .catch(err => alert(err.message));
 };
 
-window.logout = function(){
+window.logout = function () {
   auth.signOut();
 };
+
 
 
 auth.onAuthStateChanged(u=>{
@@ -405,6 +414,7 @@ window.closeSummary = function(){
 
 </body>
 </html>
+
 
 
 
