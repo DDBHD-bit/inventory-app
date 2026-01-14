@@ -190,6 +190,13 @@ window.addProduct = async function(){
 function calculateStock(bins){
   return Object.values(bins || {}).reduce((a,b)=>a+b,0);
 }
+function renderBins(bins){
+  if(!bins || Object.keys(bins).length === 0) return "—";
+
+  return Object.entries(bins)
+    .map(([bin, qty]) => `${bin}: ${qty}`)
+    .join(" | ");
+}
 
 /* ================= LOAD PRODUCTS ================= */
 window.loadProducts = async function(){
@@ -232,21 +239,28 @@ window.loadProducts = async function(){
         </div>
       `;
 
-      c.sizes.forEach(s=>{
-        const totalStock = calculateStock(s.bins);
+c.sizes.forEach(s=>{
+  const totalStock = calculateStock(s.bins);
+  const binText = renderBins(s.bins);
 
-        card.innerHTML+=`
-          <div class="size-row">
-            Size <b>${s.size}</b> |
-            ₹${s.price} |
-            <span class="${totalStock<5?'low':''}">
-              Stock ${totalStock}
-            </span>
-            <button onclick="updateStock('${s.id}','IN')">IN</button>
-            <button onclick="updateStock('${s.id}','OUT')">OUT</button>
-          </div>
-        `;
-      });
+  card.innerHTML += `
+    <div class="size-row">
+      Size <b>${s.size}</b> |
+      ₹${s.price} |
+      <span class="${totalStock < 5 ? 'low' : ''}">
+        Stock ${totalStock}
+      </span>
+
+      <div style="font-size:13px;color:#475569;margin-top:4px">
+        BIN → ${binText}
+      </div>
+
+      <button onclick="updateStock('${s.id}','IN')">IN</button>
+      <button onclick="updateStock('${s.id}','OUT')">OUT</button>
+    </div>
+  `;
+});
+
     });
 
     products.appendChild(card);
@@ -284,4 +298,5 @@ window.updateStock = async function(id,type){
 
 </body>
 </html>
+
 
